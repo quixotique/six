@@ -1,0 +1,454 @@
+#!/usr/bin/env python2.4
+# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+
+'''Run the doctests in all of the listed modules.  If a module search path is
+given with the --path option, then only that path is searched for the modules
+listed on the command line.  If the --recursive option is given, then any
+packages listed on the command line are tested, and also all modules and
+packages contained within them.
+'''
+
+import sys
+sys.path.pop(0)
+import locale
+import codecs
+import os
+import os.path
+from optparse import OptionParser
+import six.parse as parse
+from six.test import run_doctest
+from six.input import InputError
+from six.model import *
+from six.sort import *
+
+def main():
+    locale.setlocale(locale.LC_ALL, '')
+    lang, enc = locale.getlocale()
+    op = OptionParser(usage=
+        'Usage: %prog --doctest [doctest-options] [module ...]\n'
+        '       %prog [options] [expr]')
+    op.add_option('--doctest', action='callback', callback=opt_doctest,
+                  help='run doctests (see --doctest --help for options)')
+    op.add_option('-l', '--local',
+                  action='store', type='string', dest='local',
+                  help='output addresses and telephone numbers relative to '
+                       'the country or area named LOCAL')
+    op.add_option('-r', '--report',
+                  action='store', type='string', dest='report',
+                  help='select output report, REPORT is one of: dump, phone')
+    op.add_option('-a', '--all',
+                  action='store_true', dest='all',
+                  help='print all possible values')
+    op.add_option('-e', '--encode',
+                  action='store', dest='string', dest='encoding',
+                  help='use ENCODE as output encoding')
+    op.set_defaults(report='dump')
+    options, args = op.parse_args()
+    path = os.path.join(os.environ['HOME'], 'me', 'contacts', 'nlist')
+    model = Model()
+    local = None
+    try:
+        for block in parse.blocks(parse.remove_comments(parse.lines(path))):
+            model.parse_block(block)
+        model.finish_parsing()
+        if options.local:
+            local = model.world.lookup_place(options.local)
+    except InputError, e:
+        print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]), str(e))
+        model.finalise()
+        sys.exit(1)
+    # Parse command-line args as search expression.  If no args, then select
+    # all nodes.
+    try:
+        pred = None
+        if len(args):
+            for arg in args:
+                if arg.startswith('='):
+                    try:
+                        kw = model.keyword(arg[1:])
+                    except LookupError:
+                        raise ArgError('no such keyword', arg=arg)
+                    p = keyed_with(kw)
+                else:
+                    p = name_matches(arg)
+                if pred is None:
+                    pred = p
+                else:
+                    pred = pred & p
+        # Print the selected report.
+        try:
+            report = globals()['report_' + options.report]
+        except KeyError:
+            raise ArgError('unsupported report %r' % options.report)
+        report(options, model, pred, local, options.encoding or enc)
+    except ArgError, e:
+        print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]), str(e))
+        sys.exit(2)
+
+def opt_doctest(option, opt_str, value, parser, *args, **kwargs):
+    op = OptionParser(usage=r'Usage: %prog --doctest [options] [module ...]')
+    op.add_option('-v', '--verbose', action='store_true', dest='verbose',
+                  help='print all tests and results as they are run')
+    op.add_option('-r', '--recursive', action='store_true', dest='recursive',
+                  help='recurse through packages')
+    op.add_option('-p', '--path', action='store', type='string', dest='path',
+                  help='search for modules in directory PATH')
+    options, args = op.parse_args(args=parser.rargs)
+    modules = args
+    if not modules:
+        modules = ['six']
+        options.recursive = True
+    status = 0
+    for module_name in modules:
+        if not run_doctest(module_name, options.path, recurse=options.recursive,
+                           verbose=options.verbose):
+            status = 1
+    sys.exit(status)
+
+class ArgError(StandardError):
+
+    def __init__(self, msg, arg=None):
+        StandardError.__init__(self, msg)
+        self.arg = arg
+
+    def __str__(self):
+        r = []
+        if self.arg is not None:
+            r.append(repr(self.arg))
+        r.append(StandardError.__str__(self))
+        return ': '.join(r)
+
+def report_dump(options, model, predicate, local, encoding):
+    if predicate is None:
+        predicate = (
+            (from_node(Person) | from_node(Company) | from_node(Family)) &
+            is_principal)
+    sorter = Sorter()
+    sorter.update(model.nodes(predicate))
+    from six.output import Treebuf
+    tree = Treebuf(local=local)
+    for group in sorter.sorted():
+        for item in group:
+            tree.nl()
+            if item is not item.single:
+                tree.add(item.key, ' -> ', item.single.key)
+                tree.nl()
+            elif isinstance(item.node, Family):
+                dump_name(item.node, tree)
+                dump_family(item.node, tree.sub())
+            elif isinstance(item.node, Person):
+                dump_name(item.node, tree)
+                dump_person(item.node, tree.sub())
+            elif isinstance(item.node, Company):
+                dump_name(item.node, tree)
+                dump_company(item.node, tree.sub())
+    print unicode(tree).encode(encoding, 'replace')
+
+def report_email(options, model, predicate, local, encoding):
+    if predicate is None:
+        predicate = from_node(Person) | from_node(Company) | from_node(Family)
+        options.all = False
+    sorter = Sorter()
+    sorter.update(model.nodes(predicate))
+    # Remove entries for families for which one or more of the heads was found.
+    people = filter(lambda node: isinstance(node, Person), sorter)
+    for person in people:
+        for belongs_to in person.links(outgoing & is_link(Belongs_to)):
+            if belongs_to.is_head:
+                sorter.discard(belongs_to.family)
+    for group in sorter.sorted():
+        for item in group:
+            if item is not item.single:
+                continue
+            node = item.node
+            print_emails(node, encoding)
+            stop = lambda node: False
+            if isinstance(node, Organisation):
+                pred = ((incoming & is_link(Works_at)) |
+                        (outgoing & is_link(Belongs_to)) |
+                        (outgoing & is_link(Resides_at)))
+                if not options.all:
+                    stop = lambda node: isinstance(node, Person)
+            elif isinstance(node, Family):
+                pred = ((outgoing & is_link(Works_at)) |
+                        (incoming & is_link(Belongs_to)) |
+                        (outgoing & is_link(Resides_at)))
+                if not options.all:
+                    stop = lambda node: isinstance(node, Organisation)
+            else:
+                assert isinstance(node, Person)
+                pred = ((outgoing & is_link(Belongs_to)) |
+                        (outgoing & is_link(Resides_at)) |
+                        (outgoing & is_link(Works_at)))
+                if not options.all:
+                    stop = lambda node: isinstance(node, Organisation)
+            for tup in sorted(node.find_nodes(pred, stop=stop), key=len):
+                print_emails(tup[-1], encoding)
+
+def print_emails(node, encoding):
+    name = None
+    if isinstance(node, NamedNode):
+        name = unicode(node)
+    elif isinstance(node, Link):
+        if hasattr(node, 'person'):
+            name = unicode(node.person)
+        elif hasattr(node, 'who'):
+            name = unicode(node.who)
+        elif hasattr(node, 'org'):
+            name = unicode(node.org)
+    printed = 0
+    for addr in node.nodes(outgoing & is_link(Has_email)):
+        print addr.format(name, encoding)
+        printed += 1
+    return printed
+
+def report_phone(options, model, predicate, local, encoding):
+    if predicate is None:
+        predicate = ((from_node(Person) | from_node(Company)) & is_principal)
+    tkw = {'fax': False, 'bold': True}
+    sorter = Sorter()
+    sorter.update(model.nodes(predicate))
+    # Remove entries for families for which one or more of the heads was found.
+    people = filter(lambda node: isinstance(node, Person), sorter)
+    for person in people:
+        for belongs_to in person.links(outgoing & is_link(Belongs_to)):
+            if belongs_to.is_head:
+                sorter.discard(belongs_to.family)
+    from six.output import Treebuf
+    tree = Treebuf(local=local)
+    for group in sorter.sorted():
+        for item in group:
+            if item is not item.single:
+                continue
+            node = item.node
+            tree.nl()
+            tree.add(unicode(node), underline=True)
+            tree.nl()
+            sub = tree.sub()
+            telephones(node, sub, **tkw)
+            if isinstance(node, Person):
+                for tup in node.find_nodes(
+                        (outgoing & is_link(Belongs_to)) |
+                        (outgoing & is_link(Resides_at)) |
+                        (outgoing & is_link(Works_at))):
+                    telephones_qual(tup, sub, **tkw)
+            elif isinstance(node, Family):
+                for tup in node.find_nodes(outgoing & is_link(Resides_at)):
+                    comment = []
+                    for node1 in tup:
+                        if isinstance(node1, Resides_at):
+                            comment.append(node1.residence.lines[0])
+                    telephones(tup[-1], sub, comment=', '.join(comment), **tkw)
+                for link in sorted(node.links(incoming & is_link(Belongs_to))):
+                    sub.add(link.person.familiar_name())
+                    sub.nl()
+                    subsub = sub.sub()
+                    telephones(link, subsub, **tkw)
+                    telephones(link.person, subsub, **tkw)
+                    for tup in link.person.find_nodes(
+                            (outgoing & is_link(Works_at)) |
+                            (outgoing & is_link(Resides_at))):
+                        telephones_qual(tup, subsub, **tkw)
+            elif isinstance(node, Organisation):
+                for tup in node.find_nodes(outgoing & is_link(Resides_at)):
+                    comment = []
+                    for node1 in tup:
+                        if isinstance(node1, Resides_at):
+                            comment.append(node1.residence.lines[0])
+                    telephones(tup[-1], sub, comment=', '.join(comment), **tkw)
+                for link in sorted(node.links(incoming & is_link(Works_at))):
+                    sub.add(unicode(link.person))
+                    sub.nl()
+                    subsub = sub.sub()
+                    telephones(link, subsub, **tkw)
+                    telephones(link.person, subsub, **tkw)
+                    for tup in link.person.find_nodes(
+                            (outgoing & is_link(Belongs_to)) |
+                            (outgoing & is_link(Resides_at))):
+                        telephones_qual(tup, subsub, **tkw)
+    print unicode(tree).encode(encoding, 'replace')
+
+def telephones_qual(tup, tree, **kwargs):
+    qual = None
+    comment = []
+    for node in tup:
+        if qual is None:
+            if isinstance(node, Resides_at):
+                qual = qual_home
+                comment.append(node.residence.lines[0])
+            elif isinstance(node, Works_at):
+                qual = qual_work
+                comment.append(unicode(node.org))
+    telephones(tup[-1], tree, qual=qual, comment=', '.join(comment), **kwargs)
+
+from six.multilang import multilang
+from six.node import *
+from six.person import *
+from six.family import *
+from six.org import *
+from six.world import *
+from six.address import *
+from six.telephone import *
+from six.email import *
+from six.keyword import *
+from six.data import *
+from six.links import *
+
+def dump_name(node, tree):
+    prefix = ''
+    for name in uniq(node.names()):
+        tree.add(prefix, name)
+        tree.nl()
+        if not prefix:
+            prefix = '= '
+            tree = tree.sub()
+
+def dump_person(per, tree, show_family=True, show_work=True):
+    if per.birthday():
+        tree.add(unicode(multilang(en='Birthday', es='F.nac.')))
+        tree.add(': ')
+        tree.add(unicode(per.birthday()))
+        tree.nl()
+    telephones(per, tree)
+    dump_email(per, tree)
+    dump_residences(per, tree)
+    if show_family:
+        for link in per.links(outgoing & is_link(Belongs_to)):
+            tree.add('-> ')
+            tree.add(unicode(link.family))
+            tree.nl()
+            sub = tree.sub()
+            telephones(link, sub)
+            dump_email(link, sub)
+    if show_work:
+        for link in per.links(outgoing & is_link(Works_at)):
+            tree.add('-> ')
+            if link.position:
+                tree.add(link.position, ', ')
+            tree.add(unicode(link.org))
+            tree.nl()
+            sub = tree.sub()
+            telephones(link, sub)
+            dump_email(link, sub)
+    dump_data(per, tree)
+
+def dump_family(fam, tree):
+    dump_residences(fam, tree)
+    telephones(fam, tree)
+    dump_email(fam, tree)
+    dump_data(fam, tree)
+    for link in sorted(fam.links(incoming & is_link(Belongs_to))):
+        is_prin = bool(list(link.person.links(is_principal)))
+        if is_prin:
+            tree.add('-> ')
+            tree.add(unicode(link.person))
+            tree.nl()
+        else:
+            tree.add('-- ')
+            dump_name(link.person, tree)
+            dump_person(link.person, tree.sub(), show_family=False)
+
+def dump_company(com, tree):
+    telephones(com, tree)
+    dump_email(com, tree)
+    dump_residences(com, tree)
+    dump_works_at(com, tree)
+    dump_data(com, tree)
+    for dept in com.nodes(outgoing & is_link(Has_department)):
+        tree.add(unicode(dept))
+        tree.nl()
+        sub = tree.sub()
+        telephones(dept, sub)
+        dump_email(dept, sub)
+        dump_residences(dept, sub)
+        dump_works_at(dept, sub)
+        dump_data(dept, sub)
+
+qual_home = multilang(en='home', es='casa')
+qual_work = multilang(en='work', es='trab')
+
+def dump_works_at(org, tree):
+    for link in sorted(org.links(incoming & is_link(Works_at))):
+        is_prin = bool(list(link.person.links(is_principal)))
+        if is_prin:
+            tree.add('-> ')
+        else:
+            tree.add('-- ')
+        tree.add(unicode(link.person))
+        if link.position:
+            tree.add(', ', link.position)
+        tree.nl()
+        sub = tree.sub()
+        telephones(link, sub)
+        dump_email(link, sub)
+        if not is_prin:
+            dump_person(link.person, sub, show_work=False)
+
+def dump_email(who, tree):
+    for link in who.links(outgoing & is_link(Has_email)):
+        if isinstance(link, At_work):
+            tree.add(unicode(qual_work).capitalize(), ': ')
+        elif isinstance(link, At_home):
+            tree.add(unicode(qual_home).capitalize(), ': ')
+        tree.add(unicode(link.email))
+        if link.comment:
+            tree.add(' ', link.comment)
+        tree.nl()
+
+def telephones(who, tree, qual=None, comment=None, bold=False,
+               mobile=True, fixed=True, fax=True):
+    typs = []
+    if mobile:
+        typs.append(Has_mobile)
+    if fixed:
+        typs.append(Has_fixed)
+    if fax:
+        typs.append(Has_fax)
+    for typ in typs:
+        for link in who.links(outgoing & is_link(typ)):
+            telephone(link, tree, qual=qual, comment=comment, bold=bold)
+            tree.nl()
+
+def telephone(link, tree, qual=None, comment=None, bold=False):
+    if isinstance(link, Has_mobile):
+        tree.add(unicode(multilang(en='Mob', es=u'Móv')))
+    elif isinstance(link, Has_fax):
+        tree.add(u'Fax')
+    else:
+        assert isinstance(link, Has_fixed)
+        tree.add(unicode(multilang(en='Tel', es=u'Tlf')))
+    if qual:
+        tree.add(' ', unicode(qual))
+    elif isinstance(link, At_work):
+        tree.add(' ', unicode(qual_work))
+    elif isinstance(link, At_home):
+        tree.add(' ', unicode(qual_home))
+    tree.add(': ')
+    tree.add(link.tel.relative(tree.local), bold=bold)
+    if link.comment:
+        tree.add(' ', link.comment)
+    if comment:
+        tree.add(' -- ', comment)
+
+def dump_residences(who, tree):
+    for link in who.links(outgoing & is_link(Resides_at)):
+        tree.add(unicode(link.residence))
+        tree.nl()
+        telephones(link, tree.sub())
+        telephones(link.residence, tree.sub())
+
+def dump_data(who, tree):
+    for conn in who.links(is_link_only(Associated_with) |
+                          (outgoing & is_link(Is_in))):
+        tree.add('* ', unicode(conn.other(who)))
+        tree.nl()
+        sub = tree.sub()
+        if hasattr(conn, 'comment') and conn.comment:
+            sub.add(conn.comment)
+            sub.nl()
+        for data in conn.nodes(incoming & is_link(Has_context)):
+            sub.add(unicode(data))
+            sub.nl()
+
+if __name__ == '__main__':
+    main()

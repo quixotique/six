@@ -1,0 +1,226 @@
+# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+
+r'''Data model.
+'''
+
+import time
+from six.input import InputError
+from six.node import *
+from six.sort import *
+from six.personname import (PersonName, EnglishSpanishName, SingleName,
+                            DecoratedName)
+from six.date import Datetime
+
+__all__ = ['Person', 'Birthday', 'Born_on']
+
+class Person(NamedNode):
+
+    r'''A Person represents a real person, with a name.
+     - A person may belong to at most one family.
+     - A person may may work at several organisations and/or departments
+       thereof, possibly with a different title at each one.
+     - A person may have one or several phone numbers, which are probably
+       mobiles unless his/her residence is not known, in which case fixed lines
+       and faxes may also be linked directly to a person.
+     - A person may have one or more email addresses.
+    '''
+
+    def __init__(self, name):
+        assert isinstance(name, PersonName)
+        super(Person, self).__init__()
+        self.name = name
+
+    def place(self):
+        r'''A person's place depends on his/her residence(s), or if none, then
+        his/her postal address(es), or if none, then his/her phone number(s),
+        or if none, then his/her family's place.
+        '''
+        from six.links import Resides_at, Has_postal_address, Belongs_to
+        from six.telephone import Has_phone
+        return self.derive_place(outgoing & is_link(Resides_at),
+                                 outgoing & is_link(Has_postal_address),
+                                 outgoing & is_link(Belongs_to),
+                                 outgoing & is_link(Has_phone),)
+
+    def matches(self, text):
+        return self.name.matches(text)
+
+    def sort_keys(self):
+        r'''Iterate over all the sort keys that this person can have.
+        '''
+        try:
+            yield self.name.casual_name()
+        except ValueError:
+            try:
+                yield self.name.familiar_name()
+            except ValueError:
+                pass
+        try:
+            yield self.name.full_name()
+        except ValueError:
+            pass
+        try:
+            yield self.name.collation_name()
+        except ValueError:
+            pass
+
+    def names(self):
+        r'''Iterate over all the names that this person may be listed under.
+        '''
+        try:
+            yield self.name.formal_name()
+        except ValueError:
+            try:
+                yield self.name.casual_name()
+            except ValueError:
+                try:
+                    yield self.name.familiar_name()
+                except ValueError:
+                    try:
+                        yield self.name.full_name()
+                    except ValueError:
+                        pass
+        try:
+            yield self.name.complete_name()
+        except ValueError:
+            pass
+
+    def familiar_name(self):
+        r'''Return the person's name as used in a familiar context.
+        '''
+        try:
+            return self.name.familiar_name()
+        except ValueError:
+            try:
+                return self.name.casual_name()
+            except ValueError:
+                return self.name.complete_name()
+
+    def birthday(self):
+        try:
+            return self.links(outgoing & is_link(Born_on)).next()
+        except StopIteration:
+            return None
+
+    def family(self):
+        r'''A person can belong to exactly zero or one familiy.
+        @return: tuple (None, None) or tuple (Belongs_to, Family)
+        '''
+        from six.links import Belongs_to
+        families = list(self.links(outgoing & is_link(Belongs_to)))
+        if not families:
+            return None, None
+        assert len(families) == 1
+        assert families[0].person is self
+        return families[0], families[0].family
+
+    def __repr__(self):
+        return '%s(%r)' % (self.__class__.__name__, self.name)
+
+    def sortkey(self):
+        return self.name.sortkey()
+
+    @staticmethod
+    def initargs(part):
+        kw = {}
+        def set(kwname, *keys):
+            value = None
+            for key in keys:
+                if key in part:
+                    value = part.getvalue(key)
+                    break
+            if value is not None:
+                kw[kwname] = value
+        set('single', 'n')
+        if not kw:
+            set('short', 'fn-')
+            set('initials', 'fn.')
+            set('given', 'fn')
+            set('middle', 'mn')
+            set('family', 'ln')
+            set('family2', 'ln2')
+            set('title', 'tit')
+            set('honorific', 'hon')
+            set('salutation', 'sal')
+            set('letters', 'let')
+        return kw
+
+    @classmethod
+    def from_initargs(class_, kw):
+        assert len(kw) != 0
+        try:
+            nkw = {}
+            dkw = {}
+            for key in kw:
+                if key in ('title', 'salutation', 'honorific', 'letters'):
+                    dkw[key] = kw[key]
+                else:
+                    nkw[key] = kw[key]
+            if not nkw:
+                raise ValueError('missing name')
+            if 'single' in nkw:
+                name = SingleName(**nkw) 
+            else:
+                name = EnglishSpanishName(**nkw) 
+            if dkw:
+                name = DecoratedName(name, **dkw)
+            return class_(name)
+        except ValueError, e:
+            raise InputError(e, lines=kw.values())
+
+class Birthday(Node):
+
+    r'''Representation of a person's birthday as day and month.
+    '''
+
+    def __init__(self, day, month):
+        super(Birthday, self).__init__()
+        self.day = day
+        self.month = month
+
+    def __str__(self):
+        return str(unicode(self))
+
+    def __unicode__(self):
+        return self.format()
+
+    def format(self, year=None):
+        fmt = '%-d-%b'
+        if year is not None:
+            fmt += '-%Y'
+        else:
+            year = 1970
+        return time.strftime(fmt, time.struct_time(
+                             (year, self.month, self.day, 0, 0, 0, 0, 0, 0)))
+
+    def __cmp__(self, other):
+        if not isinstance(other, Birthday):
+            return NotImplemented
+        return cmp(self.month, other.month) or cmp(self.day, other.day)
+
+    @classmethod
+    def parse(class_, text):
+        dt = Datetime.parse(text, with_time=False, with_timezone=False)
+        if dt.month is None:
+            raise InputError('missing month', char=text)
+        if dt.day is None:
+            raise InputError('missing day', char=text)
+        return class_(dt.day, dt.month), dt.year
+
+class Born_on(Link):
+    def __init__(self, person, birthday, year=None):
+        assert isinstance(person, Person)
+        assert isinstance(birthday, Birthday)
+        super(Born_on, self).__init__(person, birthday)
+        self.person = person
+        self.birthday = birthday
+        self.year = year
+
+    def __str__(self):
+        return str(unicode(self))
+
+    def __unicode__(self):
+        return self.format()
+
+    def format(self):
+        return self.birthday.format(self.year)
