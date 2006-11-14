@@ -80,19 +80,21 @@ class Model(Node):
         return self.registered[Keyword][Keyword(key)]
 
     def find(self, typ, text):
-        r'''Find a single registered node that matches the given text.  If none
-        is found, but parsing is not yet complete, then suspend the calling
-        tasklet, and try again when woken.  If the `_no_suspend` attribute is
-        true, it means that tasklets are being shut down, so instead of
-        suspending, we raise LookupError.
+        r'''Find a single registered node that matches the given text.  First,
+        we suspend the calling tasklet to give all the other nodes a chance to
+        get registered.  Then we search them.  If none is found, we suspend the
+        calling tasklet, and try again when woken.  If the `_no_suspend`
+        attribute is true, it means that tasklets are being shut down, so
+        instead of suspending, we raise LookupError.
         '''
         while True:
+            self._suspend()
             found = None
             for rtyp, objs in self.registered.iteritems():
                 if issubclass(rtyp, typ):
                     for obj in objs:
                         if obj.matches(text):
-                            if not found:
+                            if found is None:
                                 found = obj
                             else:
                                 if type(typ) is type:
@@ -101,7 +103,7 @@ class Model(Node):
                                     what = '/'.join((t.__name__ for t in typ))
                                 raise LookupError('ambiguous %s "%s"' %
                                                   (what, text))
-            if found:
+            if found is not None:
                 return found
             if self._no_suspend:
                 if type(typ) is type:
@@ -109,11 +111,15 @@ class Model(Node):
                 else:
                     what = '/'.join((t.__name__ for t in typ))
                 raise LookupError('no such %s "%s"' % (what, text))
-            ch = stackless.channel()
-            self._suspended.add(ch)
-            ch.receive()
-            assert ch not in self._suspended
-            del ch
+
+    def _suspend(self):
+        r'''Suspend the running tasklet until awoken.
+        '''
+        ch = stackless.channel()
+        self._suspended.add(ch)
+        ch.receive()
+        assert ch not in self._suspended
+        del ch
 
     def parse_block(self, block):
         r'''Parse a block of lines and add the data to this data model.
@@ -158,11 +164,16 @@ class Model(Node):
         while self._suspended:
             retry = self._suspended
             self._suspended = set()
-            hung = len(retry)
-            while retry:
-                retry.pop().send(None)
-            if len(self._suspended) == hung:
-                self._no_suspend = True
+            try:
+                hung = len(retry)
+                while retry:
+                    channel = retry.pop()
+                    channel.close()
+                    channel.send(None)
+                if len(self._suspended) == hung:
+                    self._no_suspend = True
+            finally:
+                self._suspended.update(retry)
 
     def finalise(self):
         r'''Shut down all remaining, suspended tasklets.  This should be done
@@ -286,6 +297,12 @@ class Model(Node):
             per = self.parse_person(common, optional=True,
                                     principal=False if org else True)
             if org:
+                self.parse_residences(common, org)
+            elif per:
+                self.parse_residences(common, per)
+            # Now that all the named nodes are registered, we can parse contact
+            # details (which might suspend in find()).
+            if org:
                 self.parse_org_con(common, org)
                 if per:
                     self.parse_works_at(common, per, org)
@@ -294,11 +311,10 @@ class Model(Node):
             elif per:
                 self.parse_contacts_work(common, per)
             else:
-                res = self.parse_residences(common)
-                if res:
-                    self.parse_con(common, res, 'ph', Telephone, Has_fixed)
-                    self.parse_con(common, res, 'fax', Telephone, Has_fax)
-                    self.parse_con(common, res, 'com', Comment, Has_comment)
+                res = self.parse_ad(common, common.getvalue('ad'))
+                self.parse_con(common, res, 'ph', Telephone, Has_fixed)
+                self.parse_con(common, res, 'fax', Telephone, Has_fax)
+                self.parse_con(common, res, 'com', Comment, Has_comment)
             # Parse a person's contact details after he or she has been
             # associated with the company, because the "Works_at" link may help
             # determine the person's place.  Or may not.
@@ -308,14 +324,22 @@ class Model(Node):
             # "Common" must be a company.  "Members[0]" must be a
             # person and/or department.
             org = self.parse_org(common, optional=False)
-            self.parse_org_con(common, org)
-            self.parse_org_extra(common, org)
+            self.parse_residences(common, org)
             dept = self.parse_dept(members[0], optional=True)
             if dept:
                 Has_department(org, dept)
-                self.parse_org_con(members[0], dept)
+                self.parse_residences(members[0], dept)
             per = self.parse_person(members[0], optional=bool(dept),
                                     principal=members[0].delim == '+')
+            if not dept:
+                assert per
+                self.parse_residences(common, per)
+            # Now that all the named nodes are registered, we can parse contact
+            # details (which might suspend in find()).
+            self.parse_org_con(common, org)
+            self.parse_org_extra(common, org)
+            if dept:
+                self.parse_org_con(members[0], dept)
             if per:
                 self.parse_works_at(members[0], per, dept or org)
                 self.parse_person_con(members[0], per, dept)
@@ -329,35 +353,48 @@ class Model(Node):
             # part may only define a person.
             org = self.parse_org(common, optional=True)
             if org:
+                self.parse_residences(common, org)
+            else:
+                fam = self.register(Family())
+                self.parse_residences(common, fam)
+            for member in members:
+                member.dept = None
+                if org:
+                    member.dept = self.parse_dept(member, optional=True)
+                if member.dept:
+                    Has_department(org, member.dept)
+                    self.parse_residences(member, member.dept)
+                member.person = self.parse_person(member,
+                                                  optional=bool(member.dept),
+                                                  principal=member.delim != '-')
+                if not member.dept:
+                    self.parse_residences(member, member.person)
+            # Now that all the named nodes are registered, we can parse contact
+            # details (which might suspend in find()).
+            if org:
                 self.parse_org_con(common, org)
                 self.parse_org_extra(common, org)
             else:
-                fam = self.parse_family(common)
+                self.parse_family_con(common, fam)
             for member in members:
-                dept = None
+                if member.dept:
+                    self.parse_org_con(member, member.dept)
                 if org:
-                    dept = self.parse_dept(member, optional=True)
-                    if dept:
-                        Has_department(org, dept)
-                        self.parse_org_con(member, dept)
-                per = self.parse_person(member, optional=bool(dept),
-                                        principal=member.delim != '-')
-                if org:
-                    if per:
-                        self.parse_works_at(member, per, dept or org)
+                    if member.person:
+                        self.parse_works_at(member, member.person,
+                                            member.dept or org)
                     else:
-                        assert dept
-                        self.parse_org_extra(member, dept)
+                        assert member.dept
+                        self.parse_org_extra(member, member.dept)
                 else:
-                    assert per
-                    assert not dept
-                    Belongs_to(per, fam,
+                    assert member.person
+                    assert not member.dept
+                    Belongs_to(member.person, fam,
                                is_head=member.delim != '-',
                                sequence=member.sequence,
                                timestamp=member.updated or common.updated)
-                    self.parse_contacts_work(member, per)
-                self.parse_person_con(member, per, dept)
-
+                    self.parse_contacts_work(member, member.person)
+                self.parse_person_con(member, member.person, member.dept)
         # Now find lines that were not parsed, and complain about them.
         missed = set()
         for part in chain([common], members):
@@ -418,9 +455,9 @@ class Model(Node):
         just in case this part also defines a person.  If it doesn't, then the
         details we skip now will be parsed later in parse_org_extra().
         '''
-        # First, parse residences that can provide place context when parsing
+        # First, parse details that can provide place context when parsing
         # telephone numbers.
-        self.parse_residences(part, org)
+        self.parse_homes(part, org)
         self.parse_con(part, org, 'po', PostalAddress, Has_postal_address)
         # Now parse the various contact details - phone/fax numbers, email
         # addresses, web pages, etc.  We DON'T parse mobile phone numbers here,
@@ -443,7 +480,7 @@ class Model(Node):
         self.parse_keywords(part, org)
         # Parse any 'in' sub-parts.
         for sub in (s for v, s in part.mget('in', []) if s):
-            res = self.parse_residences(sub, org)
+            self.parse_homes(sub, org)
             self.parse_con(sub, org, 'po', PostalAddress, Has_postal_address)
             self.parse_con(sub, org, 'ph', Telephone, Has_fixed_home)
             self.parse_con(sub, org, 'fax', Telephone, Has_fax_home)
@@ -459,15 +496,14 @@ class Model(Node):
         for sub in (s for v, s in part.mget('in', []) if s):
             self.parse_con(sub, org, 'mob', Telephone, Has_mobile_home)
 
-    def parse_family(self, part):
-        r'''Parse a family and its associated contact details.
+    def parse_family_con(self, part, fam):
+        r'''Parse a family's contact details.
         '''
-        fam = self.register(Family())
-        res = self.parse_residences(part, fam)
-        self.parse_con(part, res or fam, 'phh', Telephone, Has_fixed_home)
-        self.parse_con(part, res or fam, 'faxh', Telephone, Has_fax_home)
-        self.parse_con(part, res or fam, 'ph', Telephone, Has_fixed)
-        self.parse_con(part, res or fam, 'fax', Telephone, Has_fax)
+        self.parse_homes(part, fam)
+        self.parse_con(part, fam, 'phh', Telephone, Has_fixed_home)
+        self.parse_con(part, fam, 'faxh', Telephone, Has_fax_home)
+        self.parse_con(part, fam, 'ph', Telephone, Has_fixed)
+        self.parse_con(part, fam, 'fax', Telephone, Has_fax)
         # Parse contact details that don't go with the residence.
         self.parse_con(part, fam, 'po', PostalAddress, Has_postal_address)
         self.parse_con(part, fam, 'mob', Telephone, Has_mobile_home)
@@ -482,10 +518,7 @@ class Model(Node):
         self.parse_keywords(part, fam)
         # Parse any 'in' sub-parts.
         for sub in (s for v, s in part.mget('in', []) if s):
-            res = self.parse_residences(sub, fam)
-            if res:
-                self.parse_con(part, res, 'ph', Telephone, Has_fixed)
-                self.parse_con(part, res, 'fax', Telephone, Has_fax)
+            self.parse_homes(sub, fam)
             self.parse_con(sub, fam, 'po', PostalAddress, Has_postal_address)
             self.parse_con(sub, fam, 'mob', Telephone, Has_mobile_home)
             self.parse_con(sub, fam, 'ph', Telephone, Has_fixed_home)
@@ -516,26 +549,25 @@ class Model(Node):
             skip those contact details which pertain to the organisation (so we
             don't parse them twice)
         '''
-        # First, parse residences that can provide place context when parsing
+        # First, parse details that provide place context when parsing
         # telephone numbers.  If this part is also used to declare an
-        # organisation, then the 'ad' and 'po' lines pertain to the
-        # organisation so we don't parse them here.
-        res = None
+        # organisation, then the 'po' lines pertain to the organisation so we
+        # don't parse them here.
         if not org:
-            res = self.parse_residences(part, per)
+            self.parse_homes(part, per)
             self.parse_con(part, per, 'po', PostalAddress, Has_postal_address)
         # Now parse the various contact details - phone/fax/mobile numbers,
         # email addresses, web pages, etc.  If this part is also used to
         # declare an organisation, then the unadorned 'ph', 'fax', etc. lines
         # pertain to the organisation, so instead we parse 'phh', 'faxh', etc.
         self.parse_con(part, per, 'mob', Telephone, Has_mobile)
-        self.parse_con(part, res or per, 'phh', Telephone, Has_fixed_home)
-        self.parse_con(part, res or per, 'faxh', Telephone, Has_fax_home)
+        self.parse_con(part, per, 'phh', Telephone, Has_fixed_home)
+        self.parse_con(part, per, 'faxh', Telephone, Has_fax_home)
         self.parse_con(part, per, 'emh', Email, Has_email_home)
         self.parse_con(part, per, 'wwwh', URI, Has_web_page)
         if not org:
-            self.parse_con(part, res or per, 'ph', Telephone, Has_fixed)
-            self.parse_con(part, res or per, 'fax', Telephone, Has_fax)
+            self.parse_con(part, per, 'ph', Telephone, Has_fixed)
+            self.parse_con(part, per, 'fax', Telephone, Has_fax)
             self.parse_con(part, per, 'em', Email, Has_email)
             self.parse_con(part, per, 'www', URI, Has_web_page)
         # Now parse 'data', 'key', and associations, which take advantage of
@@ -555,13 +587,13 @@ class Model(Node):
         # Parse any 'in' sub-parts.
         for sub in (s for v, s in part.mget('in', []) if s):
             self.parse_con(sub, per, 'mob', Telephone, Has_mobile)
-            self.parse_con(sub, res or per, 'phh', Telephone, Has_fixed_home)
-            self.parse_con(sub, res or per, 'faxh', Telephone, Has_fax_home)
+            self.parse_con(sub, per, 'phh', Telephone, Has_fixed_home)
+            self.parse_con(sub, per, 'faxh', Telephone, Has_fax_home)
             if not org:
-                res = self.parse_residences(sub, per)
+                self.parse_homes(sub, per)
                 self.parse_con(sub, per, 'po', PostalAddress, Has_postal_address)
-                self.parse_con(sub, res or per, 'ph', Telephone, Has_fixed_home)
-                self.parse_con(sub, res or per, 'fax', Telephone, Has_fax_home)
+                self.parse_con(sub, per, 'ph', Telephone, Has_fixed_home)
+                self.parse_con(sub, per, 'fax', Telephone, Has_fax_home)
                 self.parse_data(sub, per)
 
     def parse_works_at(self, part, who, org):
@@ -662,46 +694,58 @@ class Model(Node):
                 ltype(who, obj, **kw)
 
     def parse_residences(self, part, who=None):
-        r'''Parse 'ad' and 'home' lines for a person, family or organisation,
-        which define to one or more residences and contact details for that
-        person/organisation.
+        r'''Parse 'ad' lines which define one or more residences (optionally
+        with contact details), and descend into 'in' sections doing the same.
+        If given a reference to a Person, Family, or Organisation in 'who' then
+        link it (Resides_at) to each defined residence.
         '''
-        residences = set()
         for value, sub in part.mget('ad', []):
-            res, comment = Residence.parse(value,
-                                   world=  self.world,
-                                   place=  part.place,
-                                   default_place=part.defaults.place)
-            assert comment is None
-            res = self.register(res)
-            residences.add(res)
+            res = self.parse_ad(part, value, sub)
+            if who:
+                Resides_at(who, res, timestamp=(sub or part).updated)
+        for insub in (s for v, s in part.mget('in', []) if s):
+            for value, sub in insub.mget('ad', []):
+                res = self.parse_ad(part, value, sub)
+                if who:
+                    Resides_at(who, res, timestamp=(sub or part).updated)
+
+    def parse_ad(self, part, value, sub=None):
+        res, comment = Residence.parse(value,
+                               world=  self.world,
+                               place=  part.place,
+                               default_place=part.defaults.place)
+        assert comment is None
+        res = self.register(res)
+        if sub:
+            # Parse contact details for this residence - phone/fax
+            # numbers.
+            sub.place = res.place()
+            sub.updated = self.parse_update(sub) or part.updated
+            sub.defaults = part.defaults
+            self.parse_con(sub, res, 'ph', Telephone, Has_fixed)
+            self.parse_con(sub, res, 'fax', Telephone, Has_fax)
+            self.parse_con(sub, res, 'com', Comment, Has_comment)
+        return res
+
+    def parse_homes(self, part, who):
+        r'''Parse 'home' lines for a person, family or organisation, which
+        define to one or more residences (optionally with contact details) for
+        that person/organisation.
+        '''
+        for value, sub in part.mget('home', []):
+            try:
+                res = self.find(Residence, value)
+            except LookupError, e:
+                raise InputError(e, char=value)
             if sub:
-                # Parse contact details for this residence - phone/fax
-                # numbers.
                 sub.place = res.place()
                 sub.updated = self.parse_update(sub) or part.updated
                 sub.defaults = part.defaults
-                self.parse_con(sub, res, 'ph', Telephone, Has_fixed)
-                self.parse_con(sub, res, 'fax', Telephone, Has_fax)
-                self.parse_con(sub, res, 'com', Comment, Has_comment)
-            if who:
-                Resides_at(who, res, timestamp=(sub or part).updated)
-        if who:
-            for value, sub in part.mget('home', []):
-                try:
-                    res = self.find(Residence, value)
-                except LookupError, e:
-                    raise InputError(e, char=value)
-                if sub:
-                    sub.place = res.place()
-                    sub.updated = self.parse_update(sub) or part.updated
-                    sub.defaults = part.defaults
-                r = Resides_at(who, res, timestamp=(sub or part).updated)
-                if sub:
-                    self.parse_con(sub, r, 'ph', Telephone, Has_fixed)
-                    self.parse_con(sub, r, 'fax', Telephone, Has_fax)
-                    self.parse_con(sub, r, 'com', Comment, Has_comment)
-        return iter(residences).next() if len(residences) == 1 else None
+            r = Resides_at(who, res, timestamp=(sub or part).updated)
+            if sub:
+                self.parse_con(sub, r, 'ph', Telephone, Has_fixed)
+                self.parse_con(sub, r, 'fax', Telephone, Has_fax)
+                self.parse_con(sub, r, 'com', Comment, Has_comment)
 
     def parse_keywords(self, part, who):
         r'''Parse 'key' lines in a given part, dereferencing and creating
