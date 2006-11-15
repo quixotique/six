@@ -30,7 +30,7 @@ class itext(unicode):
 
     @classmethod
     def new(class_, text, loc=None):
-        r'''Since we're overriding the builtin L{str} class, we can't mess
+        r'''Since we're overriding the builtin L{unicode} class, we can't mess
         with the constructor, so we use this class method to construct itext
         instances.
         @param text: any object that supports unicode(text)
@@ -42,7 +42,7 @@ class itext(unicode):
         return line
 
     def __init__(self, text=u''):
-        str.__init__(self, text)
+        unicode.__init__(self, text)
         self.__loc = []
 
     def loc(self):
@@ -137,6 +137,7 @@ class itext(unicode):
 
     def __makeslice(self, text, start=0):
         loc = []
+        assert type(text) is unicode
         r = type(self)(text)
         assert len(r) <= len(self)
         if len(r):
@@ -162,6 +163,8 @@ class itext(unicode):
         '''
         if i < 0:
             i += len(self)
+        if not 0 <= i < len(self):
+            raise IndexError('string index out of range')
         return self.__getslice__(i, i + 1)
 
     def __getslice__(self, i, j):
