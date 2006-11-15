@@ -4,6 +4,7 @@ r'''Data model - Node and Link superclasses, and link predicate algebra.
 '''
 
 import datetime
+import unicodedata
 
 __all__ = [
         'Node', 'Link', 'NamedNode',
@@ -518,7 +519,13 @@ def _istr(text):
 
         >>> _istr('One Two Three33! 456 seven')
         ' one two three33 456 seven'
+
+        >>> _istr(u'José Muñoz Güell')
+        u' jose munoz guell'
+
     '''
+    if isinstance(text, unicode):
+        text = unicodedata.normalize('NFD', text)
     return ' '.join([''] +
                     filter(len, [filter(lambda c: c.isalnum(), word).lower()
                                  for word in text.split()]))
