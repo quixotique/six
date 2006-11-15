@@ -118,8 +118,7 @@ class World(Node):
         area = self.lookup_area(name, None)
         if area:
             return Place(area)
-        raise InputError('no country or area matching "%s"' % name,
-                         char=name)
+        raise LookupError('no country or area matching "%s"' % name)
 
     def parse_country(self, text):
         r'''Parse a country definition, and add the country to the world.
