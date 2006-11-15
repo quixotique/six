@@ -52,7 +52,6 @@ def main():
     # If the cache exists, attempt to read the model from it.  In the event
     # that it fails to read correctly, silently skip it and proceed to compile
     # the model from source, then save the compiled model in the cache.
-    sys.setrecursionlimit(4000)
     model = None
     if (    os.path.exists(cache) and
             (os.stat(path).st_mtime <= os.stat(cache).st_mtime) and
@@ -77,7 +76,10 @@ def main():
         except OSError, e:
             if e.errno != errno.ENOENT:
                 raise
+        orl = sys.getrecursionlimit()
+        sys.setrecursionlimit(4000)
         pickle.dump(model, file(cache, 'w'))
+        sys.setrecursionlimit(orl)
     # Parse command-line args as search expression.  If no args, then select
     # all nodes.
     try:
@@ -249,17 +251,20 @@ def report_phone(options, model, predicate, local, encoding):
                 continue
             node = item.node
             tree.nl()
-            tree.add(unicode(node), underline=True)
-            tree.nl()
             sub = tree.sub()
-            telephones(node, sub, **tkw)
             if isinstance(node, Person):
+                tree.add(unicode(node), underline=True)
+                tree.nl()
+                telephones(node, sub, **tkw)
                 for tup in node.find_nodes(
                         (outgoing & is_link(Belongs_to)) |
                         (outgoing & is_link(Resides_at)) |
                         (outgoing & is_link(Works_at))):
                     telephones_qual(tup, sub, **tkw)
             elif isinstance(node, Family):
+                tree.add(unicode(node), underline=True)
+                tree.nl()
+                telephones(node, sub, **tkw)
                 for tup in node.find_nodes(outgoing & is_link(Resides_at)):
                     comment = []
                     for node1 in tup:
@@ -267,7 +272,7 @@ def report_phone(options, model, predicate, local, encoding):
                             comment.append(node1.residence.lines[0])
                     telephones(tup[-1], sub, comment=', '.join(comment), **tkw)
                 for link in sorted(node.links(incoming & is_link(Belongs_to))):
-                    sub.add(link.person.familiar_name())
+                    sub.add(link.person.familiar_name(), underline=True)
                     sub.nl()
                     subsub = sub.sub()
                     telephones(link, subsub, **tkw)
@@ -277,35 +282,69 @@ def report_phone(options, model, predicate, local, encoding):
                             (outgoing & is_link(Resides_at))):
                         telephones_qual(tup, subsub, **tkw)
             elif isinstance(node, Organisation):
-                for tup in node.find_nodes(outgoing & is_link(Resides_at)):
-                    comment = []
-                    for node1 in tup:
-                        if isinstance(node1, Resides_at):
-                            comment.append(node1.residence.lines[0])
-                    telephones(tup[-1], sub, comment=', '.join(comment), **tkw)
-                for link in sorted(node.links(incoming & is_link(Works_at))):
-                    sub.add(unicode(link.person))
+                tree.add(unicode(node), underline=True)
+                if isinstance(node, Department):
+                    link = node.link(incoming & is_link(Has_department))
+                    if link:
+                        tree.add(', ', unicode(link.company))
+                tree.nl()
+                telephones(node, sub, **tkw)
+                telephones_org(node, sub, **tkw)
+                for dept in node.nodes(outgoing & is_link(Has_department)):
+                    sub.add(unicode(dept), underline=True)
                     sub.nl()
                     subsub = sub.sub()
-                    telephones(link, subsub, **tkw)
-                    telephones(link.person, subsub, **tkw)
-                    for tup in link.person.find_nodes(
-                            (outgoing & is_link(Belongs_to)) |
-                            (outgoing & is_link(Resides_at))):
-                        telephones_qual(tup, subsub, **tkw)
+                    telephones(dept, subsub, **tkw)
+                    telephones_org(dept, subsub, **tkw)
     print unicode(tree).encode(encoding, 'replace')
+
+def telephones_org(org, tree, **tkw):
+    for tup in org.find_nodes(outgoing & is_link(Resides_at)):
+        comment = []
+        for node1 in tup:
+            if isinstance(node1, Resides_at):
+                comment.append(node1.residence.lines[0])
+        telephones(tup[-1], tree, comment=', '.join(comment), **tkw)
+    for link in sorted(org.links(incoming & is_link(Works_at))):
+        tree.add(unicode(link.person), underline=True)
+        if link.position:
+            tree.add(', ', unicode(link.position))
+        tree.nl()
+        sub = tree.sub()
+        telephones(link, sub, **tkw)
+        telephones(link.person, sub, **tkw)
+        for tup in link.person.find_nodes(
+                (outgoing & is_link(Belongs_to)) |
+                (outgoing & is_link(Resides_at))):
+            telephones_qual(tup, sub, **tkw)
 
 def telephones_qual(tup, tree, **kwargs):
     qual = None
     comment = []
     for node in tup:
         if qual is None:
+            dept = None
             if isinstance(node, Resides_at):
                 qual = qual_home
                 comment.append(node.residence.lines[0])
             elif isinstance(node, Works_at):
                 qual = qual_work
+                if node.position and node is tup[-1]:
+                    comment.append(node.position)
                 comment.append(unicode(node.org))
+                if isinstance(node.org, Department):
+                    dept = node.org
+            elif isinstance(node, Department):
+                dept = node
+            elif isinstance(node, Has_department) and node.dept is dept:
+                dept = None
+                comment.append(unicode(node.company))
+            # If we finished at a Department node, we'd better print the name
+            # of the Company too.
+            if dept:
+                link = dept.link(incoming & is_link(Has_department))
+                if link:
+                    comment.append(unicode(link.company))
     telephones(tup[-1], tree, qual=qual, comment=', '.join(comment), **kwargs)
 
 from six.multilang import multilang
