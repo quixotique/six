@@ -370,19 +370,19 @@ def is_link_only(typ):
         >>> b21 = B(n2, n1)
         >>> c12 = C(n1, n2)
         >>> c21 = C(n2, n1)
-        >>> set(n1.links(is_link(A))) == set([a12, a31])
+        >>> set(n1.links(is_link_only(A))) == set([a12, a31])
         True
-        >>> set(n1.links(~is_link(A))) == set([c12, c21])
+        >>> set(n1.links(~is_link_only(A))) == set([b13, b21, c12, c21])
         True
-        >>> set(n1.links(is_link(A) & outgoing)) == set([a12])
+        >>> set(n1.links(is_link_only(A) & outgoing)) == set([a12])
         True
-        >>> set(n1.links(is_link(B))) == set([b21, b13])
+        >>> set(n1.links(is_link_only(B))) == set([b21, b13])
         True
-        >>> set(n1.links(is_link(C))) == set([c12, c21])
+        >>> set(n1.links(is_link_only(C))) == set([c12, c21])
         True
-        >>> set(n1.links(is_link(C) | is_link(B))) == set([b21, b13, c12, c21])
+        >>> set(n1.links(is_link_only(C) | is_link_only(B))) == set([b21, b13, c12, c21])
         True
-        >>> set(n1.links(outgoing & (is_link(C) | is_link(B)))) == set([b13, c12])
+        >>> set(n1.links(outgoing & (is_link_only(C) | is_link_only(B)))) == set([b13, c12])
         True
 
     '''
