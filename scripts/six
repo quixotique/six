@@ -55,7 +55,8 @@ def main():
     sys.setrecursionlimit(4000)
     model = None
     if (    os.path.exists(cache) and
-            (os.stat(path).st_mtime <= os.stat(cache).st_mtime)):
+            (os.stat(path).st_mtime <= os.stat(cache).st_mtime) and
+            (os.stat(sys.argv[0]).st_mtime <= os.stat(cache).st_mtime)):
         try:
             model = pickle.load(file(cache, 'r'))
         except StandardError:
