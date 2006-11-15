@@ -14,6 +14,8 @@ import locale
 import codecs
 import os
 import os.path
+import cPickle as pickle
+import errno
 from optparse import OptionParser
 import six.parse as parse
 from six.test import run_doctest
@@ -45,21 +47,45 @@ def main():
     op.set_defaults(report='dump')
     options, args = op.parse_args()
     path = os.path.join(os.environ['HOME'], 'me', 'contacts', 'nlist')
-    model = Model()
-    local = None
-    try:
-        for block in parse.blocks(parse.remove_comments(parse.lines(path))):
-            model.parse_block(block)
-        model.finish_parsing()
-        if options.local:
-            local = model.world.lookup_place(options.local)
-    except InputError, e:
-        print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]), str(e))
-        model.finalise()
-        sys.exit(1)
+    cache = os.path.join(os.path.dirname(path),
+                         '.six-cache-' + os.path.basename(path))
+    # If the cache exists, attempt to read the model from it.  In the event
+    # that it fails to read correctly, silently skip it and proceed to compile
+    # the model from source, then save the compiled model in the cache.
+    sys.setrecursionlimit(4000)
+    model = None
+    if (    os.path.exists(cache) and
+            (os.stat(path).st_mtime <= os.stat(cache).st_mtime)):
+        try:
+            model = pickle.load(file(cache, 'r'))
+        except StandardError:
+            pass
+    if model is None:
+        model = Model()
+        try:
+            for block in parse.blocks(parse.remove_comments(parse.lines(path))):
+                model.parse_block(block)
+            model.finish_parsing()
+        except InputError, e:
+            print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]),
+                                            str(e))
+            model.finalise()
+            sys.exit(1)
+        try:
+            os.remove(cache)
+        except OSError, e:
+            if e.errno != errno.ENOENT:
+                raise
+        pickle.dump(model, file(cache, 'w'))
     # Parse command-line args as search expression.  If no args, then select
     # all nodes.
     try:
+        local = None
+        if options.local:
+            try:
+                local = model.world.lookup_place(options.local)
+            except LookupError, e:
+                raise ArgError(e, arg=options.local)
         pred = None
         if len(args):
             for arg in args:
