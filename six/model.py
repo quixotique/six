@@ -757,14 +757,18 @@ class Model(Node):
             for text in part.mgetvalue('key-'):
                 for keyword in self.split_keywords(text):
                     omit.add(keyword)
-        for keyword in self.defaults.keywords:
+        for keyword in part.defaults.keywords:
             if keyword not in omit:
-                Keyed_with(who, keyword, timestamp=part.updated)
+                if not who.link(outgoing & is_link(Keyed_with) &
+                                to_node(keyword)):
+                    Keyed_with(who, keyword, timestamp=part.updated)
         if 'key' in part:
             for text in part.mgetvalue('key'):
                 for keyword in self.split_keywords(text):
                     if keyword not in omit:
-                        Keyed_with(who, keyword, timestamp=part.updated)
+                        if not who.link(outgoing & is_link(Keyed_with) &
+                                        to_node(keyword)):
+                            Keyed_with(who, keyword, timestamp=part.updated)
 
     def split_keywords(self, text):
         r'''Parse a string contining zero or more keywords and iterate over the
