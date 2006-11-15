@@ -89,7 +89,6 @@ def main():
         pred = None
         if len(args):
             for arg in args:
-                arg = arg.decode(enc)
                 if arg.startswith('='):
                     try:
                         kw = model.keyword(arg[1:])
@@ -97,7 +96,7 @@ def main():
                         raise ArgError('no such keyword', arg=arg)
                     p = keyed_with(kw)
                 else:
-                    p = name_matches(arg)
+                    p = name_matches(arg.decode(enc))
                 if pred is None:
                     pred = p
                 else:
