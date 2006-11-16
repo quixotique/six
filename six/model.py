@@ -156,6 +156,7 @@ class ModelParser(object):
         r'''Finish parsing all the data blocks that were started by
         parse_block() since the model parser was instantiated, or since the
         last call to finish_parsing().
+
         All suspended tasklets are awoken, to give them a chance to resolve
         their node references.  If none of them succeed, then it means we must
         have a circular reference, or that the remaining references are just
@@ -196,8 +197,8 @@ class ModelParser(object):
                 # Found more than one node - bail out.
                 raise
             except LookupError, e:
-                # Found no node.  If we are not bailing out, suspend, and try
-                # again.
+                # Found no node.  If we are bailing out, then re-raise the
+                # exception, otherwise suspend and try again.
                 if self._no_suspend:
                     raise 
 
@@ -502,7 +503,7 @@ class ModelParser(object):
         # context provided by residence and phone numbers already parsed.
         self.parse_con(part, org, 'com', Comment, Has_comment)
         self.parse_data(part, org)
-        self.parse_assoc(part, org, 'with', NamedNode, Associated_with,
+        self.parse_assoc(part, org, 'with', NamedNode, With,
                          self.parse_assoc_contacts)
         self.parse_assoc(part, org, 'ex', NamedNode, Ex,
                          self.parse_assoc_contacts)
@@ -540,7 +541,7 @@ class ModelParser(object):
         self.parse_con(part, fam, 'www', URI, Has_web_page)
         self.parse_con(part, fam, 'com', Comment, Has_comment)
         self.parse_data(part, fam)
-        self.parse_assoc(part, fam, 'with', NamedNode, Associated_with,
+        self.parse_assoc(part, fam, 'with', NamedNode, With,
                          self.parse_assoc_contacts)
         self.parse_assoc(part, fam, 'ex', NamedNode, Ex,
                          self.parse_assoc_contacts)
@@ -609,7 +610,7 @@ class ModelParser(object):
             # Parse any 'work', 'with', and 'ex' sub-parts.
             self.parse_assoc(part, per, 'work', (Organisation, Residence),
                              Works_at, self.parse_assoc_contacts_work)
-            self.parse_assoc(part, per, 'with', NamedNode, Associated_with,
+            self.parse_assoc(part, per, 'with', NamedNode, With,
                              self.parse_assoc_contacts)
             self.parse_assoc(part, per, 'ex', NamedNode, Ex,
                              self.parse_assoc_contacts)
@@ -646,8 +647,9 @@ class ModelParser(object):
 
     def parse_assoc(self, part, who, key, ntype, ltype, parse_sub=None):
         r'''Parse an association line, look up the referred node, and link it
-        to a given node with an Associated_with or subclass thereof.  Parse any
-        contact details, data, and comments that pertain to the association.
+        to a given node with an Association link or subclass thereof.  Parse
+        any contact details, data, and comments that pertain to the
+        association.
         '''
         if key in part:
             for name, sub in part.mget(key):
@@ -671,7 +673,7 @@ class ModelParser(object):
         r'''Create an Associate_with link (or subtype) between two nodes,
         with suitable constructor data.
         '''
-        assert issubclass(ltype, Associated_with)
+        assert issubclass(ltype, Association)
         # Here we should introspect the keyword args accepted by
         # ltype() and adapt accordingly.  One day.
         kw = {'timestamp': timestamp}

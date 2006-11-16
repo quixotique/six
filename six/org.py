@@ -89,9 +89,9 @@ class Has_department(Link):
         self.company = company
         self.dept = dept
 
-from six.links import Associated_with
+from six.links import Association
 
-class Works_at(Associated_with):
+class Works_at(Association):
 
     r'''An association between a person and an organisation, which implies
     certain things, such as the existence of some kind of employment contract,
@@ -114,7 +114,7 @@ class Works_at(Associated_with):
         self.sequence = sequence
 
     def __cmp__(self, other):
-        if not isinstance(other, Associated_with):
+        if not isinstance(other, Works_at):
             return NotImplemented
         return (cmp(self.sequence or 0, other.sequence or 0) or
                 cmp(self.person.sortkey(), other.person.sortkey()))

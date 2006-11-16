@@ -506,8 +506,7 @@ def dump_residences(who, tree):
         telephones(link.residence, tree.sub())
 
 def dump_data(who, tree):
-    for conn in who.links(is_link_only(Associated_with) |
-                          (outgoing & is_link(Is_in))):
+    for conn in who.links(is_link(With) | (outgoing & is_link(Is_in))):
         tree.add('* ', unicode(conn.other(who)))
         tree.nl()
         sub = tree.sub()

@@ -9,7 +9,7 @@ __all__ = [
         'Is_in',
         'Belongs_to',
         'Resides_at', 'Has_postal_address',
-        'Associated_with', 'Ex',
+        'Association', 'With', 'Ex',
     ]
 
 class Is_in(Link):
@@ -115,26 +115,33 @@ class Has_postal_address(Link):
         '''
         return self.postal.place()
 
-class Associated_with(Link):
+class Association(Link):
 
-    r'''An association between two nodes could mean almost anything.  For
-    example:
-     - Person-Person: family relationships, eg parent-child, sibling,
-       (ex-)partner, godparent; professional relationships, eg, attourney,
-       physician, tax agent
-     - Person-Organisation: employee, member, client, supplier, director
-     - Family-Organisation: client, member
-
-    Subclasses of Associated_with exist where a distinction is useful.
+    r'''An association between two nodes could mean almost anything.  To
+    explain the association, the 'description' may be used.  Subclasses of
+    Association are defined to narrow the meaning, and may impose specific
+    semantics on 'description'.
     '''
 
     def __init__(self, node1, node2, position=None, timestamp=None):
         if position is not None:
             assert isinstance(position, basestring)
-        super(Associated_with, self).__init__(node1, node2, timestamp=timestamp)
+        super(Association, self).__init__(node1, node2, timestamp=timestamp)
         self.position = position
 
-class Ex(Associated_with):
+class With(Association):
+
+    r'''A 'With' association between two nodes represents a real-world
+    connection of some sort, which may act as the context for comments, data,
+    and even contact details.  For example:
+     - Person-Person: family relationships, eg parent-child, sibling,
+       (ex-)partner, godparent; professional relationships, eg, attourney,
+       physician, tax agent
+     - Person-Organisation: employee, member, client, supplier, director
+     - Family-Organisation: client, member
+    '''
+
+class Ex(Association):
 
     r'''A historical association between a person and an organisation,
     indicating a stronger relationship (eg, employment, membership) which once

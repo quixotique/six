@@ -48,7 +48,7 @@ class Has_context(Link):
         from six.family import Family
         from six.org import Organisation
         assert isinstance(data, Data)
-        assert isinstance(context, (Associated_with, Is_in, Person, Family, Organisation))
+        assert isinstance(context, (Association, Is_in, Person, Family, Organisation))
         super(Has_context, self).__init__(data, context, timestamp=timestamp)
         self.data = data
         self.context = context
