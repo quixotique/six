@@ -62,15 +62,17 @@ def main():
             pass
     if model is None:
         model = Model()
+        parser = ModelParser(model)
         try:
             for block in parse.blocks(parse.remove_comments(parse.lines(path))):
-                model.parse_block(block)
-            model.finish_parsing()
+                parser.parse_block(block)
+            parser.finish_parsing()
         except InputError, e:
             print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]),
                                             str(e))
-            model.finalise()
             sys.exit(1)
+        finally:
+            parser.finalise()
         try:
             os.remove(cache)
         except OSError, e:

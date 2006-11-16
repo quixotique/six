@@ -9,8 +9,8 @@ from itertools import chain
 from six.struct import struct
 import six.parse as parse
 from six.multilang import multilang
-from six.world import World
 from six.input import InputError
+from six.world import *
 from six.node import *
 from six.node import link_predicate
 from six.links import *
@@ -25,29 +25,22 @@ from six.date import *
 from six.data import *
 from six.comment import *
 
-__all__ = ['Model', 'In_model', 'is_principal']
+__all__ = ['Model', 'ModelParser', 'In_model', 'is_principal']
 
 class Model(Node):
 
-    r'''The data model consists of a world model (countries and areas) plus a
-    graph (network) of data nodes joined by directional links.  Some types of
-    nodes are indexed by the model so they can be found by textual search.
-    Other nodes are intended to be found from one or more starting nodes by
-    selectively traversing the graph.
+    r'''The data model consists of a graph (network) of data nodes joined by
+    directional links.  Some types of nodes are indexed by the model so they
+    can be found by textual search.  Other nodes are intended to be found from
+    one or more starting nodes by selectively traversing the graph.
+
+    A data model is populated by a ModelParser.
     '''
 
     def __init__(self):
         super(Model, self).__init__()
-        self.world = World()
-        self.last_country = None
-        self.defaults = struct(place=None, keywords=[])
         self.registered = {}
         self.data_keys = {}
-        self._suspended = set()
-        self._no_suspend = False
-        self.dfactory = {}
-        self.dfactory_default = Data_factory_context()
-        self.last_dfactory = None
 
     def register(self, node, principal=True):
         r'''Register an object for searching later.  If an equivalent object is
@@ -80,63 +73,70 @@ class Model(Node):
         return self.registered[Keyword][Keyword(key)]
 
     def find(self, typ, text):
-        r'''Find a single registered node that matches the given text.  First,
-        we suspend the calling tasklet to give all the other nodes a chance to
-        get registered.  Then we search them.  If none is found, we suspend the
-        calling tasklet, and try again when woken.  If the `_no_suspend`
-        attribute is true, it means that tasklets are being shut down, so
-        instead of suspending, we raise LookupError.
+        r'''Find a single registered node that matches the given text.
+        @return: the single node of the given type that matches the text
+        @raise FindError: more than one node matches
+        @raise LookupError: no node matches
         '''
-        while True:
-            self._suspend()
-            found = None
-            for rtyp, objs in self.registered.iteritems():
-                if issubclass(rtyp, typ):
-                    for obj in objs:
-                        if obj.matches(text):
-                            if found is None:
-                                found = obj
-                            else:
-                                if type(typ) is type:
-                                    what = typ.__name__
-                                else:
-                                    what = '/'.join((t.__name__ for t in typ))
-                                raise LookupError('ambiguous %s "%s"' %
-                                                  (what, text))
-            if found is not None:
-                return found
-            if self._no_suspend:
-                if type(typ) is type:
-                    what = typ.__name__
-                else:
-                    what = '/'.join((t.__name__ for t in typ))
-                raise LookupError('no such %s "%s"' % (what, text))
+        found = None
+        for rtyp, objs in self.registered.iteritems():
+            if issubclass(rtyp, typ):
+                for obj in objs:
+                    if obj.matches(text):
+                        if found is None:
+                            found = obj
+                        else:
+                            raise FindError('ambiguous %s "%s"' %
+                                            (_type_names(typ), text))
+        if found is not None:
+            return found
+        raise LookupError('no such %s "%s"' % (_type_names(typ), text))
 
-    def _suspend(self):
-        r'''Suspend the running tasklet until awoken.
-        '''
-        ch = stackless.channel()
-        self._suspended.add(ch)
-        ch.receive()
-        assert ch not in self._suspended
-        del ch
+def _type_names(typ):
+    if type(typ) is type:
+        return typ.__name__
+    return '/'.join((t.__name__ for t in typ))
+
+class FindError(LookupError):
+    r'''A find error is raised by Model.find() if more than one node matches
+    the given text.  By raising a distinct exception type, the caller can
+    distinguish between that, and the case where no node matches, when
+    resolving the reference dependency order.
+    '''
+    pass
+
+class ModelParser(object):
+
+    r'''A model parser provides methods for compiling text source into a model.
+    '''
+
+    def __init__(self, model):
+        self.model = model
+        self.world = World()
+        self.last_country = None
+        self.defaults = struct(place=None, keywords=[])
+        self.dfactory = {}
+        self.dfactory_default = Data_factory_context()
+        self.last_dfactory = None
+        self._data_block_parsers = []
+        self._suspended = set()
+        self._no_suspend = False
 
     def parse_block(self, block):
-        r'''Parse a block of lines and add the data to this data model.
+        r'''Parse a block of lines and add the data to the data model.
         The block is either a "control" block (lines starting with '%') or
         a data block.  Each is handled separately.
         
         Control blocks are parsed immediately, and modify the 'world' and
-        'defaults' attributes of the model.  These attributes are used when
+        'defaults' attributes of the parser.  These attributes are used when
         parsing data blocks.
 
-        Data blocks are parsed each in its own tasklet.  If, during parsing, a
-        reference to a node from another data block cannot be resolved (see the
-        Model.find() method) then the tasklet is suspended until later blocks
-        have been parsed.  This neatly resolves forward references.  The
-        tasklet is passed a copy of the 'defaults' attribute so that if more
-        control blocks are parsed while it is suspended, that will not affect
-        it.
+        Data blocks are parsed by instantiating a new tasklet,
+        _parse_data_block, and running it, which either parses until it
+        finishes, or suspends itself in the first find() that fails to find a
+        node. The tasklet is passed a copy of the 'defaults' struct so that if
+        more control blocks are parsed while it is suspended, that will not
+        affect it.
         '''
 
         if parse.is_control_line(block[0]):
@@ -148,18 +148,20 @@ class Model(Node):
                 'data': self.parse_control_data,
             })
         else:
-            task = stackless.tasklet(self._parse_data_block)
-            task.setup(block, copy.copy(self.defaults))
-            task.run()
+            parser = stackless.tasklet(self._parse_data_block)
+            parser.setup(block, copy.copy(self.defaults))
+            parser.run()
 
     def finish_parsing(self):
-        r'''Perform post-parsing cleanup.  After this, the parse_block() method
-        should not be invoked.  All suspended tasklets are awoken, to give them
-        a chance to resolve their node references.  If none of them succeed,
-        then it means we must have a circular reference, or that the remaining
-        references are just incorrect, so we proceed to awaken the tasklets
-        with the '_no_suspend' attribute set, which will cause the first one
-        that wakes to raise LookupError.
+        r'''Finish parsing all the data blocks that were started by
+        parse_block() since the model parser was instantiated, or since the
+        last call to finish_parsing().
+        All suspended tasklets are awoken, to give them a chance to resolve
+        their node references.  If none of them succeed, then it means we must
+        have a circular reference, or that the remaining references are just
+        incorrect, so we proceed to awaken the tasklets with the '_no_suspend'
+        attribute set, which will cause the first one that wakes to raise
+        LookupError.
         '''
         while self._suspended:
             retry = self._suspended
@@ -181,6 +183,32 @@ class Model(Node):
         '''
         while self._suspended:
             self._suspended.pop().send_exception(TaskletExit)
+
+    def find(self, typ, text):
+        r'''Call self.model.find() and if it fails to find any node, suspend
+        the current tasklet and queue ourselves to be resumed later.
+        '''
+        while True:
+            self._suspend()
+            try:
+                return self.model.find(typ, text)
+            except FindError, e:
+                # Found more than one node - bail out.
+                raise
+            except LookupError, e:
+                # Found no node.  If we are not bailing out, suspend, and try
+                # again.
+                if self._no_suspend:
+                    raise 
+
+    def _suspend(self):
+        r'''Suspend the running tasklet until awoken.
+        '''
+        ch = stackless.channel()
+        self._suspended.add(ch)
+        ch.receive()
+        assert ch not in self._suspended
+        del ch
 
     def parse_default(self, text):
         r'''Parse a '%default' control line, and update the 'defaults' struct
@@ -209,6 +237,7 @@ class Model(Node):
         country to the model's 'world' World() object.
         '''
         self.last_country = self.world.parse_country(text)
+        Has_country(self.model, self.last_country)
         return self.last_country
 
     def parse_area(self, text):
@@ -355,7 +384,7 @@ class Model(Node):
             if org:
                 self.parse_residences(common, org)
             else:
-                fam = self.register(Family())
+                fam = self.model.register(Family())
                 self.parse_residences(common, fam)
             for member in members:
                 member.dept = None
@@ -432,7 +461,7 @@ class Model(Node):
         name = part.getvalue('co')
         aka = part.mgetvalue('aka', [])
         prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
-        org = self.register(Company(name=name, aka=aka, prefer=prefer))
+        org = self.model.register(Company(name=name, aka=aka, prefer=prefer))
         dept = self.parse_dept(part, org=org, optional=True)
         if dept:
             Has_department(org, dept)
@@ -447,7 +476,7 @@ class Model(Node):
         name = part.getvalue('de')
         aka = part.mgetvalue('aka', []) if not org else []
         prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
-        return self.register(Department(name=name, aka=aka, prefer=prefer))
+        return self.model.register(Department(name=name, aka=aka, prefer=prefer))
 
     def parse_org_con(self, part, org):
         r'''Parse contact details that may be associated with an organisation
@@ -534,11 +563,11 @@ class Model(Node):
             if optional:
                 return None
             raise InputError('missing person', line=part)
-        per = self.register(Person.from_initargs(pn), principal=principal)
+        per = self.model.register(Person.from_initargs(pn), principal=principal)
         # Birthday.
         if 'bd' in part:
             birthday, year = Birthday.parse(part.getvalue('bd'))
-            birthday = self.register(birthday)
+            birthday = self.model.register(birthday)
             Born_on(per, birthday, year=year)
         return per
 
@@ -715,7 +744,7 @@ class Model(Node):
                                place=  part.place,
                                default_place=part.defaults.place)
         assert comment is None
-        res = self.register(res)
+        res = self.model.register(res)
         if sub:
             # Parse contact details for this residence - phone/fax
             # numbers.
@@ -777,7 +806,7 @@ class Model(Node):
         for word in text.split():
             keyword, rem = Keyword.parse(word)
             assert rem is None
-            yield self.register(keyword)
+            yield self.model.register(keyword)
 
     def parse_update(self, part):
         r'''Parse the 'upd' line in a part, and return a corresponding
@@ -801,10 +830,10 @@ class Model(Node):
                     raise InputError('missing "="', char=text)
                 dat = self.dfactory.get(id, self.dfactory_default)\
                                        (part, who, id, value)
-                if dat.key() in self.data_keys:
+                if dat.key() in self.model.data_keys:
                     raise InputError('duplicate data %r for %s (%s)' %
                                      (id, who, context), char=text)
-                self.data_keys[dat.key()] = dat
+                self.model.data_keys[dat.key()] = dat
 
     def split_data(self, text):
         r'''Partially parse a 'data' or '%data' line into an id string and

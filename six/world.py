@@ -8,12 +8,12 @@ from six.multilang import multilang
 from six.input import InputError
 from six.node import *
 
-__all__ = ['World', 'Country', 'Area', 'Place']
+__all__ = ['World', 'Country', 'Area', 'Place', 'Has_country', 'Has_area']
 
-class World(Node):
+class World(object):
 
-    r'''The world is a single node that has links to all the known country
-    nodes.
+    r'''The world is an object in which Country nodes can be registered for
+    easy lookup.
 
         >>> w = World()
         >>> w
@@ -31,7 +31,6 @@ class World(Node):
     '''
 
     def __init__(self, countries=None):
-        super(World, self).__init__()
         self._countries = dict(((c.iso3166_a2, c) for c in countries or []))
         self._ccodes = dict(((c.ccode, c) for c in countries or []))
         self._lookup_country_cache = {}
@@ -44,17 +43,12 @@ class World(Node):
         return '%s(%s)' % (self.__class__.__name__, ', '.join(r))
 
     def add(self, country):
-        Has_country(self, country)
-
-    def add_link(self, link):
-        super(World, self).add_link(link)
-        if isinstance(link, Has_country):
-            if link.country.iso3166_a2 in self._countries:
-                raise ValueError, 'duplicate country %s' % link.country.iso3166_a2
-            if link.country.ccode in self._ccodes:
-                raise ValueError, 'duplicate country code %s' % link.country.ccode
-            self._countries[link.country.iso3166_a2] = link.country
-            self._ccodes[link.country.ccode] = link.country
+        if country.iso3166_a2 in self._countries:
+            raise ValueError, 'duplicate country %s' % country.iso3166_a2
+        if country.ccode in self._ccodes:
+            raise ValueError, 'duplicate country code %s' % country.ccode
+        self._countries[country.iso3166_a2] = country
+        self._ccodes[country.ccode] = country
 
     def __contains__(self, country):
         return self._countries.get(country.iso3166_a2) is country
@@ -410,12 +404,10 @@ class Area(Node):
             raise InputError(e, line=otext)
 
 class Has_country(Link):
-    def __init__(self, world, country, timestamp=None):
-        assert isinstance(world, World)
+    def __init__(self, node1, country, timestamp=None):
         assert isinstance(country, Country)
-        self.world = world
         self.country = country
-        super(Has_country, self).__init__(world, country, timestamp=timestamp)
+        super(Has_country, self).__init__(node1, country, timestamp=timestamp)
 
 class Has_area(Link):
     def __init__(self, country, area, timestamp=None):
