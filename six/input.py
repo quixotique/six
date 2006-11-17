@@ -45,6 +45,11 @@ class itext(unicode):
         unicode.__init__(self, text)
         self.__loc = []
 
+    def __reduce__(self):
+        r'''We pickle ourselves to a unicode string.
+        '''
+        return (unicode, (unicode(self),))
+
     def loc(self):
         r'''Return the location of the first "located" character in this
         string, or if the string has no location, then return None.
