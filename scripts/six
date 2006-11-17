@@ -170,9 +170,14 @@ def report_dump(options, model, predicate, local, encoding):
             elif isinstance(item.node, Person):
                 dump_name(item.node, tree)
                 dump_person(item.node, tree.sub())
-            elif isinstance(item.node, Company):
+            elif isinstance(item.node, Department):
+                com = item.node.node(incoming & is_link(Has_department))
+                dump_name(item.node, tree,
+                          qual=(', ', unicode(com)) if com else None)
+                dump_organisation(item.node, tree.sub())
+            elif isinstance(item.node, Organisation):
                 dump_name(item.node, tree)
-                dump_company(item.node, tree.sub())
+                dump_organisation(item.node, tree.sub())
     print unicode(tree).encode(encoding, 'replace')
 
 def report_email(options, model, predicate, local, encoding):
@@ -351,6 +356,7 @@ def telephones_qual(tup, tree, **kwargs):
 
 from six.multilang import multilang
 from six.node import *
+from six.links import *
 from six.person import *
 from six.family import *
 from six.org import *
@@ -360,18 +366,22 @@ from six.telephone import *
 from six.email import *
 from six.keyword import *
 from six.data import *
-from six.links import *
+from six.comment import *
 
-def dump_name(node, tree):
+def dump_name(node, tree, qual=None):
     prefix = ''
     for name in uniq(node.names()):
         tree.add(prefix, name)
+        if qual:
+            tree.add(*qual)
+            qual = None
         tree.nl()
         if not prefix:
             prefix = '= '
             tree = tree.sub()
 
 def dump_person(per, tree, show_family=True, show_work=True):
+    dump_comments(per, tree)
     if per.birthday():
         tree.add(unicode(multilang(en='Birthday', es='F.nac.')))
         tree.add(': ')
@@ -386,6 +396,7 @@ def dump_person(per, tree, show_family=True, show_work=True):
             tree.add(unicode(link.family))
             tree.nl()
             sub = tree.sub()
+            dump_comments(link, sub)
             telephones(link, sub)
             dump_email(link, sub)
     if show_work:
@@ -396,11 +407,13 @@ def dump_person(per, tree, show_family=True, show_work=True):
             tree.add(unicode(link.org))
             tree.nl()
             sub = tree.sub()
+            dump_comments(link, sub)
             telephones(link, sub)
             dump_email(link, sub)
     dump_data(per, tree)
 
 def dump_family(fam, tree):
+    dump_comments(fam, tree)
     dump_residences(fam, tree)
     telephones(fam, tree)
     dump_email(fam, tree)
@@ -411,26 +424,31 @@ def dump_family(fam, tree):
             tree.add('-> ')
             tree.add(unicode(link.person))
             tree.nl()
+            sub = tree.sub()
+            dump_comments(link, sub)
+            telephones(link, sub)
+            dump_email(link, sub)
         else:
             tree.add('-- ')
             dump_name(link.person, tree)
-            dump_person(link.person, tree.sub(), show_family=False)
+            sub = tree.sub()
+            dump_comments(link, sub)
+            telephones(link, sub)
+            dump_email(link, sub)
+            dump_person(link.person, sub, show_family=False)
 
-def dump_company(com, tree):
+def dump_organisation(com, tree):
+    dump_comments(com, tree)
     telephones(com, tree)
     dump_email(com, tree)
     dump_residences(com, tree)
     dump_works_at(com, tree)
     dump_data(com, tree)
-    for dept in com.nodes(outgoing & is_link(Has_department)):
-        tree.add(unicode(dept))
+    for link in com.links(outgoing & is_link(Has_department)):
+        tree.add(unicode(link.dept))
         tree.nl()
-        sub = tree.sub()
-        telephones(dept, sub)
-        dump_email(dept, sub)
-        dump_residences(dept, sub)
-        dump_works_at(dept, sub)
-        dump_data(dept, sub)
+        dump_comments(link, tree.sub())
+        dump_organisation(link.dept, tree.sub())
 
 qual_home = multilang(en='home', es='casa')
 qual_work = multilang(en='work', es='trab')
@@ -447,6 +465,7 @@ def dump_works_at(org, tree):
             tree.add(', ', link.position)
         tree.nl()
         sub = tree.sub()
+        dump_comments(link, sub)
         telephones(link, sub)
         dump_email(link, sub)
         if not is_prin:
@@ -458,10 +477,16 @@ def dump_email(who, tree):
             tree.add(unicode(qual_work).capitalize(), ': ')
         elif isinstance(link, At_home):
             tree.add(unicode(qual_home).capitalize(), ': ')
+        tree.set_wrapmargin()
         tree.add(unicode(link.email))
-        if link.comment:
-            tree.add(' ', link.comment)
+        wrap_comments(link.email, tree)
+        wrap_comments(link, tree)
         tree.nl()
+
+def wrap_comments(node, tree):
+    comment = getattr(node, 'comment', None)
+    if comment:
+        tree.wrap('; ', comment)
 
 def telephones(who, tree, qual=None, comment=None, bold=False,
                mobile=True, fixed=True, fax=True):
@@ -492,30 +517,50 @@ def telephone(link, tree, qual=None, comment=None, bold=False):
     elif isinstance(link, At_home):
         tree.add(' ', unicode(qual_home))
     tree.add(': ')
+    tree.set_wrapmargin()
     tree.add(link.tel.relative(tree.local), bold=bold)
-    if link.comment:
-        tree.add(' ', link.comment)
+    wrap_comments(link.tel, tree)
+    wrap_comments(link, tree)
     if comment:
-        tree.add(' -- ', comment)
+        tree.wrap(' -- ', comment)
 
 def dump_residences(who, tree):
     for link in who.links(outgoing & is_link(Resides_at)):
         tree.add(unicode(link.residence))
         tree.nl()
-        telephones(link, tree.sub())
-        telephones(link.residence, tree.sub())
+        sub = tree.sub()
+        dump_comments(link, sub)
+        telephones(link, sub)
+        dump_comments(link.residence, sub)
+        telephones(link.residence, sub)
 
 def dump_data(who, tree):
-    for conn in who.links(is_link(With) | (outgoing & is_link(Is_in))):
-        tree.add('* ', unicode(conn.other(who)))
+    for link in who.links(is_link(With) | (outgoing & is_link(Is_in))):
+        position = getattr(link, 'position', None)
+        other = link.other(who)
+        tree.add('* ')
+        if position and isinstance(other, Organisation):
+            tree.add(position, ', ')
+            position = None
+        if isinstance(link, Is_in):
+            tree.add('in ')
+        tree.add(unicode(other))
+        if position:
+            tree.add(', ', position)
         tree.nl()
         sub = tree.sub()
-        if hasattr(conn, 'comment') and conn.comment:
-            sub.add(conn.comment)
-            sub.nl()
-        for data in conn.nodes(incoming & is_link(Has_context)):
+        dump_comments(link, sub)
+        for data in link.nodes(incoming & is_link(Has_context)):
             sub.add(unicode(data))
             sub.nl()
+            dump_comments(data, sub.sub())
+
+def dump_comments(node, tree):
+    for com in node.nodes(outgoing & is_link(Has_comment)):
+        tree.add('; ')
+        tree.set_wrapmargin()
+        tree.wrap(unicode(com))
+        tree.nl()
 
 if __name__ == '__main__':
     main()
