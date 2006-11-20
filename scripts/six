@@ -21,6 +21,7 @@ import six.parse as parse
 from six.test import run_doctest
 from six.input import InputError
 from six.model import *
+from six.links import *
 from six.sort import *
 
 def main():
@@ -88,7 +89,7 @@ def main():
         local = None
         if options.local:
             try:
-                local = model.world.lookup_place(options.local)
+                local = model.lookup_place(options.local)
             except LookupError, e:
                 raise ArgError(e, arg=options.local)
         pred = None
@@ -100,6 +101,12 @@ def main():
                     except LookupError:
                         raise ArgError('no such keyword', arg=arg)
                     p = keyed_with(kw)
+                elif arg.startswith('in:'):
+                    try:
+                        place = model.lookup_place(arg[3:])
+                    except LookupError, e:
+                        raise ArgError(e, arg=arg[3:])
+                    p = from_node(NamedNode) & in_place(place)
                 else:
                     p = name_matches(arg.decode(enc))
                 if pred is None:
@@ -356,7 +363,6 @@ def telephones_qual(tup, tree, **kwargs):
 
 from six.multilang import multilang
 from six.node import *
-from six.links import *
 from six.person import *
 from six.family import *
 from six.org import *

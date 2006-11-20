@@ -158,6 +158,8 @@ class Country(Node):
         >>> c.matches('au')
         True
         >>> c.matches('aust')
+        False
+        >>> c.matches('australia')
         True
         >>> c.matches('oz')
         False
@@ -251,6 +253,27 @@ class Country(Node):
     def iterareas(self):
         return self._areas.itervalues()
 
+    def lookup_area(self, name, *args):
+        if len(args) > 1:
+            raise TypeError(
+                    'lookup_area() takes at most 3 arguments (%s given)' %
+                    (2 + len(args)))
+        matched = []
+        for area in self.iterareas():
+            if area.matches(name):
+                matched.append(area)
+        if len(matched) == 0:
+            if not args:
+                raise LookupError('no area in %s matching "%s"' %
+                                  (self.name, name))
+            return args[0]
+        if len(matched) > 1:
+            raise LookupError('in %s ambiguous area name "%s" matches %s' % (
+                    self.name, name,
+                    ' and '.join((str(a.name) for a in matches))))
+        found = matched[0]
+        return found
+
     @classmethod
     def parse(class_, text):
         r'''Parse a country definition text.
@@ -328,13 +351,17 @@ class Area(Node):
         >>> str(sa)
         'SA'
         >>> sa.matches('au')
-        True
+        False
         >>> sa.matches('aust')
+        False
+        >>> sa.matches('australia')
+        False
+        >>> sa.matches('south australia')
         True
         >>> sa.matches('sa')
         True
         >>> sa.matches('south')
-        True
+        False
     '''
 
     def __init__(self, country, acode, name, fullname=None):

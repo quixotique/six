@@ -28,15 +28,25 @@ class Family(NamedNode):
             r.append(person.name.familiar_name())
         return u' & '.join(r)
 
-    def place(self):
+    def only_place(self):
         r'''A family's place depends on its residence(s), or if there are none,
         its postal address(es), or if none, its phone number(s).
         '''
         from six.links import Resides_at, Has_postal_address
         from six.telephone import Has_phone
-        return self.derive_place(outgoing & is_link(Resides_at),
-                                 outgoing & is_link(Has_postal_address),
-                                 outgoing & is_link(Has_phone))
+        return self.derive_only_place(outgoing & is_link(Resides_at),
+                                      outgoing & is_link(Has_postal_address),
+                                      outgoing & is_link(Has_phone))
+
+    def _all_places(self):
+        from six.links import Resides_at, Has_postal_address, Belongs_to
+        from six.telephone import Has_phone
+        for tup in self.find_nodes((outgoing & is_link(Resides_at)) |
+                                   (outgoing & is_link(Has_postal_address)) |
+                                   (incoming & is_link(Belongs_to)) |
+                                   (outgoing & is_link(Has_phone))):
+            if tup[-1].place:
+                yield tup[-1].place
 
     def heads(self):
         from six.links import Belongs_to

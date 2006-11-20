@@ -92,6 +92,12 @@ class Model(Node):
             return found
         raise LookupError('no such %s "%s"' % (_type_names(typ), text))
 
+    def lookup_place(self, name):
+        r'''Return a Place object with the Country or Area node that matches
+        the given name.
+        '''
+        return Place(self.find((Country, Area), name))
+
 def _type_names(typ):
     if type(typ) is type:
         return typ.__name__
@@ -237,7 +243,7 @@ class ModelParser(object):
         r'''Parse a '%country' declaration control line, and add the parsed
         country to the model's 'world' World() object.
         '''
-        self.last_country = self.world.parse_country(text)
+        self.last_country = self.model.register(self.world.parse_country(text))
         Has_country(self.model, self.last_country)
         return self.last_country
 
@@ -247,7 +253,8 @@ class ModelParser(object):
         '''
         if self.last_country is None:
             raise InputError('no preceding country definition', line=text)
-        return self.world.parse_area(text, self.last_country)
+        return self.model.register(
+                self.world.parse_area(text, self.last_country))
 
     def parse_control_in(self, text):
         r'''Parse a '%in' control line, which sets the place context for
@@ -716,7 +723,8 @@ class ModelParser(object):
                 obj, comment = ntype.parse(text,
                                place=part.place,
                                world=self.world,
-                               default_place=who.place() or part.defaults.place)
+                               default_place=who.only_place() or
+                                             part.defaults.place)
                 kw = {}
                 if comment:
                     kw['comment'] = comment
@@ -750,7 +758,7 @@ class ModelParser(object):
         if sub:
             # Parse contact details for this residence - phone/fax
             # numbers.
-            sub.place = res.place()
+            sub.place = res.only_place()
             sub.updated = self.parse_update(sub) or part.updated
             sub.defaults = part.defaults
             self.parse_con(sub, res, 'ph', Telephone, Has_fixed)
@@ -769,7 +777,7 @@ class ModelParser(object):
             except LookupError, e:
                 raise InputError(e, char=value)
             if sub:
-                sub.place = res.place()
+                sub.place = res.only_place()
                 sub.updated = self.parse_update(sub) or part.updated
                 sub.defaults = part.defaults
             r = Resides_at(who, res, timestamp=(sub or part).updated)
@@ -865,8 +873,8 @@ class In_model(Link):
         self.model = model
         self.principal = principal
 
-    def place(self):
-        return self.node.place()
+    def only_place(self):
+        return self.node.only_place()
 
 @link_predicate
 def is_principal(node, link):

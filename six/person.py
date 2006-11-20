@@ -30,17 +30,30 @@ class Person(NamedNode):
         super(Person, self).__init__()
         self.name = name
 
-    def place(self):
+    def only_place(self):
         r'''A person's place depends on his/her residence(s), or if none, then
         his/her postal address(es), or if none, then his/her phone number(s),
         or if none, then his/her family's place.
         '''
         from six.links import Resides_at, Has_postal_address, Belongs_to
         from six.telephone import Has_phone
-        return self.derive_place(outgoing & is_link(Resides_at),
-                                 outgoing & is_link(Has_postal_address),
-                                 outgoing & is_link(Belongs_to),
-                                 outgoing & is_link(Has_phone),)
+        return self.derive_only_place(outgoing & is_link(Resides_at),
+                                      outgoing & is_link(Has_postal_address),
+                                      outgoing & is_link(Belongs_to),
+                                      outgoing & is_link(Has_phone),)
+
+    def _all_places(self):
+        from six.links import Resides_at, Has_postal_address, Belongs_to
+        from six.org import Works_at, Has_department
+        from six.telephone import Has_phone
+        for tup in self.find_nodes((outgoing & is_link(Resides_at)) |
+                                   (outgoing & is_link(Works_at)) |
+                                   (incoming & is_link(Has_department)) |
+                                   (outgoing & is_link(Belongs_to)) |
+                                   (outgoing & is_link(Has_postal_address)) |
+                                   (outgoing & is_link(Has_phone))):
+            if tup[-1].place:
+                yield tup[-1].place
 
     def matches(self, text):
         return self.name.matches(text)

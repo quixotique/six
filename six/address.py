@@ -26,34 +26,28 @@ class Address(Node):
         assert isinstance(place, Place)
         super(Address, self).__init__()
         self.lines = tuple(lines)
-        self._place = place
+        self.place = place
         from six.links import Is_in
         Is_in(self, place)
 
-    def place(self):
-        r'''An address's place doesn't depend on any of its links -- it's
-        inherent in the address itself.
-        '''
-        return self._place
-
     def __unicode__(self):
         return u'; '.join(list(self.lines) +
-                          [unicode(self._place.country).upper()])
+                          [unicode(self.place.country).upper()])
 
     def __str__(self):
         return str(unicode(self))
 
     def __repr__(self):
         return '%s(lines=%r, place=%r)' % (self.__class__.__name__,
-                self.lines, self._place)
+                self.lines, self.place)
 
     def __hash__(self):
-        return hash(self._place) ^ hash(self.lines)
+        return hash(self.place) ^ hash(self.lines)
 
     def __eq__(self, other):
         if not isinstance(other, Address):
             return NotImplemented
-        return self._place == other._place and self.lines == other.lines
+        return self.place == other.place and self.lines == other.lines
 
     def __ne__(self, other):
         if not isinstance(other, Address):
@@ -94,9 +88,9 @@ class Address(Node):
             Address(lines=('50 Clifton St', 'Maylands SA 5069'), place=Place(Area(Country('AU', 'en_AU', '61', multilang('Australia')), '8', multilang('SA'), fullname=multilang('South Australia'))))
             >>> com is None
             True
-            >>> a.place().country is au
+            >>> a.only_place().country is au
             True
-            >>> a.place().area is sa
+            >>> a.only_place().area is sa
             True
 
             >>> a, com = Address.parse('50 Clifton St, Maylands SA 5069, AUSTRALIA', w, place=Place(au))
@@ -116,6 +110,10 @@ class Address(Node):
             InputError: address must be in Australia
 
             >>> a, com = Address.parse('C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, default_place=Place(au))
+            >>> a.only_place().country is es
+            True
+            >>> a.only_place().area is None
+            True
 
             >>> a, com = Address.parse('C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, place=Place(sa))
             Traceback (most recent call last):
@@ -126,6 +124,16 @@ class Address(Node):
             InputError: address must be in SA
 
             >>> a, com = Address.parse('C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, default_place=Place(sa))
+            >>> a.only_place().country is es
+            True
+            >>> a.only_place().area is None
+            True
+
+            >>> a, com = Address.parse('C/ Bienandanza, 6; 45216 SA; ESPAÑA', w, default_place=Place(sa))
+            >>> a.only_place().country is es
+            True
+            >>> a.only_place().area is None
+            True
 
         The string representation of an Address should, of course, parse to an
         equivalent Address object, given the same world:
@@ -161,7 +169,7 @@ class Address(Node):
             raise InputError('address too short', char=text)
         area = None
         try:
-            area = world.lookup_area(
+            area = country.lookup_area(
                     [word for word in lines[-1].split() if word.isalpha()][-1],
                     None)
         except IndexError:

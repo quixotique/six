@@ -6,6 +6,7 @@ r'''Multi-language text.
 import locale
 import re
 from six.input import *
+from six.text import *
 
 __all__ = ['multilang']
 
@@ -139,10 +140,11 @@ class multilang(object):
                           for k in sorted(self.alt.keys()))))
 
     def matches(self, text):
+        text = text_match_key(text)
         if hasattr(self, 'text'):
-            return self.text.lower().startswith(text.lower())
+            return text_match_key(self.text) == text
         for v in self.alt.itervalues():
-            if v.lower().startswith(text.lower()):
+            if text_match_key(v) == text:
                 return True
         return False
 

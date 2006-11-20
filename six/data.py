@@ -98,7 +98,7 @@ class Data_factory_context(object):
     def __call__(self, part, context, id, value):
         from six.links import Is_in
         if not isinstance(context, Link):
-            place = part.place or context.place()
+            place = part.place or context.only_place()
             if not place:
                 raise InputError('data context (place) unknown',
                                  line=value)

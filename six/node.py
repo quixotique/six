@@ -4,13 +4,13 @@ r'''Data model - Node and Link superclasses, and link predicate algebra.
 '''
 
 import datetime
-import unicodedata
+from six.text import *
 
 __all__ = [
         'Node', 'Link', 'NamedNode',
         'incoming', 'outgoing', 'is_link', 'is_link_only',
         'from_node', 'to_node',
-        'has_place', 'test_link', 'name_matches',
+        'has_place', 'in_place', 'test_link', 'name_matches',
     ]
 
 class Node(object):
@@ -23,6 +23,7 @@ class Node(object):
 
     def __init__(self):
         self._links = set()
+        self.place = None
 
     def add_link(self, r):
         r'''Used by Link().'''
@@ -30,11 +31,25 @@ class Node(object):
         if r not in self._links:
             self._links.add(r)
 
-    def place(self):
+    def only_place(self):
         r'''Deduce the place (area or country) to which this node pertains,
         based on its links to other nodes.
         '''
-        return None
+        return self.place
+
+    def all_places(self):
+        r'''Iterate over all the places (areas and/or countries) to which this
+        node pertains, based on its links to other nodes.
+        '''
+        from six.sort import uniq
+        return uniq(self._all_places())
+
+    def _all_places(self):
+        r'''Internal implementation of all_places() that can yield the same
+        place more than once.
+        '''
+        if self.place:
+            yield self.place
 
     def __unicode__(self):
         return unicode(str(self))
@@ -42,7 +57,7 @@ class Node(object):
     def __str__(self):
         return self.__class__.__name__
 
-    def derive_place(self, *preds):
+    def derive_only_place(self, *preds):
         r'''Determine the place of this node, based on the links that satisfy
         a series of predicates.
         '''
@@ -50,8 +65,8 @@ class Node(object):
         for pred in preds:
             for link in self.links(pred):
                 if place is None:
-                    place = link.place()
-                elif place != link.place():
+                    place = link.only_place()
+                elif place != link.only_place():
                     place = None
                     break
             if place is not None:
@@ -464,9 +479,24 @@ def to_node(node):
     return link_predicate(lambda node0, link: link.node2 is node)
 
 def has_place(place):
-    r'''Return a predicate that selects links with the given place.
+    r'''Return a predicate that selects links with the given only place.
     '''
-    return link_predicate(lambda node, link: link.place() == place)
+    return link_predicate(lambda node, link: link.only_place() == place)
+
+def in_place(place):
+    r'''Return a predicate that selects links that are in a given place.
+    '''
+    @link_predicate
+    def test_is_in(node, link):
+        other = link.other(node)
+        for p in other.all_places():
+            if place.area is not None:
+                if p.area == place.area:
+                    return True
+            elif p.country == place.country:
+                return True
+        return False
+    return test_is_in
 
 def test_link(func):
     r'''Return a predicate that selects links with a given named attribute with
@@ -503,29 +533,13 @@ def name_matches(text):
     r'''Return a predicate that selects links to named nodes whose name(s)
     match the given text.
     '''
-    itext = _istr(text)
+    itext = text_match_key(text)
     def _match(node, link):
         oth = link.other(node)
         if not isinstance(oth, NamedNode):
             return False
         for name in oth.names():
-            if itext in _istr(name):
+            if itext in text_match_key(name):
                 return True
         return False
     return link_predicate(_match)
-
-def _istr(text):
-    r'''Convert a text into an index string, used for matching searches.
-
-        >>> _istr('One Two Three33! 456 seven')
-        ' one two three33 456 seven'
-
-        >>> _istr(u'José Muñoz Güell')
-        u' jose munoz guell'
-
-    '''
-    if isinstance(text, unicode):
-        text = unicodedata.normalize('NFD', text)
-    return ' '.join([''] +
-                    filter(len, [filter(lambda c: c.isalnum(), word).lower()
-                                 for word in text.split()]))

@@ -27,7 +27,7 @@ class Telephone(Node):
         Telephone(place=Place(Country('AU', 'en_AU', '61', multilang('Australia'), aprefix='0', sprefix='1')), acode='8', local='123-4567')
         >>> str(t)
         '+61 8 123-4567'
-        >>> t.place()
+        >>> t.only_place()
         Place(Country('AU', 'en_AU', '61', multilang('Australia'), aprefix='0', sprefix='1'))
         >>> t.acode
         '8'
@@ -63,14 +63,9 @@ class Telephone(Node):
         elif acode is not None:
             raise ValueError('area codes are not used in %s' % place.country)
         super(Telephone, self).__init__()
-        self._place = place
+        self.place = place
         self.local = local
         self.acode = acode
-
-    def place(self):
-        r'''The place of a telephone number comes from its country code.
-        '''
-        return self._place
 
     def __unicode__(self):
         return unicode(str(self))
@@ -79,7 +74,7 @@ class Telephone(Node):
         return self.absolute()
 
     def __repr__(self):
-        r = ['place=%r' % self._place]
+        r = ['place=%r' % self.place]
         if self.acode:
             r.append('acode=%r' % self.acode)
         r.append('local=%r' % self.local)
@@ -87,7 +82,7 @@ class Telephone(Node):
 
     def absolute(self):
         return '+' + ' '.join(filter(bool,
-            [self._place.country.ccode, self.acode, self.local]))
+            [self.place.country.ccode, self.acode, self.local]))
 
     def relative(self, place):
         r'''
@@ -123,7 +118,7 @@ class Telephone(Node):
         '''
         if place is not None:
             assert isinstance(place, Place)
-        if not place or self._place.country is not place.country:
+        if not place or self.place.country is not place.country:
             return self.absolute()
         r = [str(self.local)]
         assert place.country
@@ -134,7 +129,7 @@ class Telephone(Node):
             if not place.area or self.acode != place.area.acode:
                 r.insert(0, ' ')
                 r.insert(0, str(self.acode))
-                r.insert(0, str(self._place.country.aprefix))
+                r.insert(0, str(self.place.country.aprefix))
         elif (place.country.aprefix and
               not (place.country.sprefix and
                    self.local.startswith(place.country.sprefix))):
@@ -159,7 +154,7 @@ class Telephone(Node):
         '''
         if not isinstance(other, Telephone):
             return NotImplemented
-        return self._place.country is other._place.country and \
+        return self.place.country is other.place.country and \
                self.acode == other.acode and \
                self.local == other.local
 
@@ -359,9 +354,7 @@ class Has_phone(Link):
         self.who = who
         self.tel = tel
         self.comment = comment
-
-    def place(self):
-        return self.tel.place()
+        self.place = tel.place
 
 class At_home(object):
     r'''A Has_phone mixin to mark a phone number as a home phone number if that
@@ -377,9 +370,9 @@ class At_work(object):
 
 class Has_mobile(Has_phone):
 
-    def place(self):
+    def only_place(self):
         r'''Mobile phones can contribute country but not area information, so
-        it's best to ignore them.
+        it's best to ignore them when parsing place-context-sensitive data.
         '''
         return None
 

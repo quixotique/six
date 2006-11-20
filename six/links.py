@@ -29,7 +29,7 @@ class Is_in(Link):
         self.node = node
         self.where = place
 
-    def place(self):
+    def only_place(self):
         return self.where
 
 class Belongs_to(Link):
@@ -51,8 +51,8 @@ class Belongs_to(Link):
         self.is_head = bool(is_head)
         self.sequence = sequence
 
-    def place(self):
-        return self.family.place()
+    def only_place(self):
+        return self.family.only_place()
 
     def __cmp__(self, other):
         if not isinstance(other, Belongs_to):
@@ -77,15 +77,15 @@ class Resides_at(Link):
         self.who = who
         self.residence = residence
 
-    def place(self):
+    def only_place(self):
         r'''A residence's place determines a person's place, but if the
         residence's place is unknown, then the residential phone numbers can
         give a clue.
         '''
-        place = self.residence.place()
+        place = self.residence.only_place()
         if place:
             return place
-        return self.derive_place(outgoing & linked(Has_phone))
+        return self.derive_only_place(outgoing & linked(Has_phone))
 
     def __repr__(self):
         r = ['who=%r' % self.who, 'residence=%r' % self.residence]
@@ -110,10 +110,10 @@ class Has_postal_address(Link):
         self.who = who
         self.postal = postal
 
-    def place(self):
+    def only_place(self):
         r'''A postal address's place can determine a person's place.
         '''
-        return self.postal.place()
+        return self.postal.only_place()
 
 class Association(Link):
 

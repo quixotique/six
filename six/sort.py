@@ -5,6 +5,7 @@ r'''Data model - sorting.
 
 from itertools import imap, ifilter, chain
 from six.node import *
+from six.text import *
 
 __all__ = ['SortItem', 'Sorter', 'uniq']
 
@@ -75,7 +76,7 @@ class SortItem(object):
         assert isinstance(node, Node)
         self.node = node
         self.key = key
-        self.sortkey = _bstr(key)
+        self.sortkey = text_sort_key(key)
         self.single = single if single is not None else self
 
     def __cmp__(self, other):
@@ -88,10 +89,6 @@ class SortItem(object):
         if self.single is not self:
             r.append('single=%r' % self.single)
         return '%s(%s)' % (self.__class__.__name__, ', '.join(r))
-
-def _bstr(text):
-    return filter(lambda c: c.isalpha() or c.isspace() or c == ',', text)\
-            .lower()
 
 def uniq(seq, key=None):
     u = set()
