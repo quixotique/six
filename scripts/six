@@ -165,6 +165,7 @@ def report_dump(options, model, predicate, local, encoding):
     sorter.update(model.nodes(predicate))
     from six.output import Treebuf
     tree = Treebuf(local=local)
+    seen = set(sorter)
     for group in sorter.sorted():
         for item in group:
             tree.nl()
@@ -173,18 +174,18 @@ def report_dump(options, model, predicate, local, encoding):
                 tree.nl()
             elif isinstance(item.node, Family):
                 dump_name(item.node, tree)
-                dump_family(item.node, tree.sub())
+                dump_family(item.node, tree.sub(), seen)
             elif isinstance(item.node, Person):
                 dump_name(item.node, tree)
-                dump_person(item.node, tree.sub())
+                dump_person(item.node, tree.sub(), seen)
             elif isinstance(item.node, Department):
                 com = item.node.node(incoming & is_link(Has_department))
                 dump_name(item.node, tree,
                           qual=(', ', unicode(com)) if com else None)
-                dump_organisation(item.node, tree.sub())
+                dump_organisation(item.node, tree.sub(), seen)
             elif isinstance(item.node, Organisation):
                 dump_name(item.node, tree)
-                dump_organisation(item.node, tree.sub())
+                dump_organisation(item.node, tree.sub(), seen)
     print unicode(tree).encode(encoding, 'replace')
 
 def report_email(options, model, predicate, local, encoding):
@@ -386,7 +387,8 @@ def dump_name(node, tree, qual=None):
             prefix = '= '
             tree = tree.sub()
 
-def dump_person(per, tree, show_family=True, show_work=True):
+def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
+                show_data=True):
     dump_comments(per, tree)
     if per.birthday():
         tree.add(unicode(multilang(en='Birthday', es='F.nac.')))
@@ -396,18 +398,30 @@ def dump_person(per, tree, show_family=True, show_work=True):
     telephones(per, tree)
     dump_email(per, tree)
     dump_residences(per, tree)
+    seen |= set([per])
     if show_family:
         for link in per.links(outgoing & is_link(Belongs_to)):
-            tree.add('-> ')
+            refonly = link.family in seen
+            if refonly:
+                tree.add('-> ')
+            else:
+                tree.add('-- ')
             tree.add(unicode(link.family))
             tree.nl()
             sub = tree.sub()
             dump_comments(link, sub)
             telephones(link, sub)
             dump_email(link, sub)
+            if not refonly:
+                dump_family(link.family, sub, seen,
+                            show_members=False, show_data=False)
     if show_work:
         for link in per.links(outgoing & is_link(Works_at)):
-            tree.add('-> ')
+            refonly = link.org in seen
+            if refonly:
+                tree.add('-> ')
+            else:
+                tree.add('-- ')
             if link.position:
                 tree.add(link.position, ', ')
             tree.add(unicode(link.org))
@@ -416,53 +430,72 @@ def dump_person(per, tree, show_family=True, show_work=True):
             dump_comments(link, sub)
             telephones(link, sub)
             dump_email(link, sub)
-    dump_data(per, tree)
+            if not refonly:
+                dump_organisation(link.org, sub, seen,
+                                  show_workers=False, show_data=False)
+    if show_data:
+        dump_data(per, tree)
 
-def dump_family(fam, tree):
+def dump_family(fam, tree, seen=frozenset(), show_members=True, show_data=True):
+    seen |= set([fam])
     dump_comments(fam, tree)
     dump_residences(fam, tree)
     telephones(fam, tree)
     dump_email(fam, tree)
-    dump_data(fam, tree)
-    for link in sorted(fam.links(incoming & is_link(Belongs_to))):
-        is_prin = bool(list(link.person.links(is_principal)))
-        if is_prin:
-            tree.add('-> ')
-            tree.add(unicode(link.person))
-            tree.nl()
-            sub = tree.sub()
-            dump_comments(link, sub)
-            telephones(link, sub)
-            dump_email(link, sub)
-        else:
-            tree.add('-- ')
-            dump_name(link.person, tree)
-            sub = tree.sub()
-            dump_comments(link, sub)
-            telephones(link, sub)
-            dump_email(link, sub)
-            dump_person(link.person, sub, show_family=False)
+    if show_data:
+        dump_data(fam, tree)
+    if show_members:
+        for link in sorted(fam.links(incoming & is_link(Belongs_to))):
+            refonly = link.person in seen
+            if refonly:
+                tree.add('-> ')
+                tree.add(unicode(link.person))
+                tree.nl()
+                sub = tree.sub()
+                dump_comments(link, sub)
+                telephones(link, sub)
+                dump_email(link, sub)
+            else:
+                tree.add('-- ')
+                dump_name(link.person, tree)
+                sub = tree.sub()
+                dump_comments(link, sub)
+                telephones(link, sub)
+                dump_email(link, sub)
+                dump_person(link.person, sub, seen, show_family=False,
+                            show_data=show_data)
 
-def dump_organisation(com, tree):
+def dump_organisation(com, tree, seen=frozenset(), show_workers=True,
+                      show_data=True):
+    seen |= set([com])
     dump_comments(com, tree)
     telephones(com, tree)
     dump_email(com, tree)
     dump_residences(com, tree)
-    dump_works_at(com, tree)
-    dump_data(com, tree)
+    if show_workers:
+        dump_works_at(com, tree, seen)
+    if show_data:
+        dump_data(com, tree)
     for link in com.links(outgoing & is_link(Has_department)):
+        refonly = link.dept in seen
+        if refonly:
+            tree.add('-> ')
         tree.add(unicode(link.dept))
         tree.nl()
-        dump_comments(link, tree.sub())
-        dump_organisation(link.dept, tree.sub())
+        sub = tree.sub()
+        dump_comments(link, sub)
+        if not refonly:
+            dump_organisation(link.dept, sub, seen, show_workers=show_workers,
+                              show_data=show_data)
 
 qual_home = multilang(en='home', es='casa')
 qual_work = multilang(en='work', es='trab')
 
-def dump_works_at(org, tree):
+def dump_works_at(org, tree, seen):
+    assert org in seen
     for link in sorted(org.links(incoming & is_link(Works_at))):
-        is_prin = bool(list(link.person.links(is_principal)))
-        if is_prin:
+        refonly = link.person in seen
+        if refonly:
             tree.add('-> ')
         else:
             tree.add('-- ')
@@ -474,8 +507,9 @@ def dump_works_at(org, tree):
         dump_comments(link, sub)
         telephones(link, sub)
         dump_email(link, sub)
-        if not is_prin:
-            dump_person(link.person, sub, show_work=False)
+        if not refonly:
+            dump_person(link.person, sub, seen,
+                        show_work=False, show_data=False)
 
 def dump_email(who, tree):
     for link in who.links(outgoing & is_link(Has_email)):
