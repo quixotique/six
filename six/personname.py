@@ -94,15 +94,16 @@ class PersonName(object):
     @name_method
     def complete_name(self):
         r'''All the known words of the person's name, with title and letters if
-        known, preferring proper names over contractions or abbreviations if
-        possible.  Guaranteed to succeed.
+        known, preferring proper names over contractions or abbreviations or
+        initials if possible.  Guaranteed to succeed.
         '''
         return None
 
     @name_method
     def legal_name(self):
         r'''All the uncontracted words of the person's name, omitting title,
-        letters and honorific, and without contractions or abbreviations.
+        letters and honorific, not using contractions or abbreviations or
+        initials.
         @raise ValueError: if the legal name is not known (missing a word)
         '''
         return None
@@ -256,19 +257,19 @@ class EnglishSpanishName(PersonName):
 
                             Given   Middle  Family  Family2
         Legal name           y      [y]      y      [y]
-        Full name           (i)      -       y      [y]
-        Casual name         (ii)     -       y       -
-        Familiar name       (ii)     -       -       -
+        Full name           (i)     (i)      y      [y]
+        Casual name         (ii)    (ii)     y       -
+        Familiar name       (ii)    (ii)     -       -
         Title name           -       -       y       -
         Collation name      (i)      [y]     y      [y]
 
     [y] Only used if known.
 
-    (i) If the given name is not known in these cases, then initials are used,
-    if known.
+    (i) If the given/middle name is not known in these cases, then initials are
+    used, if known.
 
-    (ii) The given names used in these cases are the contracted (short) form,
-    if known.  If only the initials are known, they are not used.
+    (ii) The given/middle name(s) used in these cases are the contracted
+    (short) form, if known.  If only the initials are known, they are not used.
 
     Note that for Anglic names, which only have a single family name, the full
     name and casual name forms are the same if there is no contracted given
@@ -316,7 +317,7 @@ class EnglishSpanishName(PersonName):
         >>> n.matches('Smith Zacharias')
         False
 
-        >>> n = EnglishSpanishName(initials="Z.", family="Smith")
+        >>> n = EnglishSpanishName(giveni="Z.", family="Smith")
         >>> n.complete_name()
         'Z. Smith'
         >>> n.legal_name()
@@ -351,8 +352,9 @@ class EnglishSpanishName(PersonName):
 
     '''
 
-    def __init__(self, given=None, short=None, initials=None,
-                       middle=None, family=None, family2=None):
+    def __init__(self, given=None, short=None, giveni=None,
+                       middle=None, middlei=None,
+                       family=None, family2=None):
         r'''Construct a conventional English or Spanish name.  At least one of
         family name or given/short name must be supplied, or ValueError is
         raised.
@@ -366,13 +368,13 @@ class EnglishSpanishName(PersonName):
             Paco or Fran for Francisco, and Maite for Maria Teresa -- the name
             María is very common for women, so is nearly always omitted or
             contracted in casual use.
-        @param initials: The initials of the person's given name, and possibly
-            middle name.
+        @param giveni: The initials of the person's given name.
         @param middle: The person's middle name (or names).  These are given
             names which follow the christian name and are usually omitted
             except on official (governmental) paperwork (eg, passport and
             tax-related) and in very formal contexts (such as weddings and
             funerals).  Spanish people seldom have such middle names.
+        @param middlei: The initials of the person's middle name.
         @param family: The person's family name.  In England and Australia, the
             family name is also called "surname", and it is usually used in
             full in all contexts -- contractions or omissions are rare.  In
@@ -388,8 +390,9 @@ class EnglishSpanishName(PersonName):
         '''
         assert given is None or isinstance(given, basestring) and given
         assert short is None or isinstance(short, basestring) and short
-        assert initials is None or isinstance(initials, basestring) and initials
+        assert giveni is None or isinstance(giveni, basestring) and giveni
         assert middle is None or isinstance(middle, basestring) and middle
+        assert middlei is None or isinstance(middlei, basestring) and middlei
         assert family is None or isinstance(family, basestring) and family
         assert family2 is None or isinstance(family2, basestring) and family2
         if not (short or given or family):
@@ -403,24 +406,28 @@ class EnglishSpanishName(PersonName):
         PersonName.__init__(self)
         self.given = given and given.strip()
         self.short = short and short.strip()
-        self.initials = initials and initials.strip()
+        self.giveni = giveni and giveni.strip()
         self.middle = middle and middle.strip()
+        self.middlei = middlei and middlei.strip()
         self.family = family and family.strip()
         self.family2 = family2 and family2.strip()
 
     def _elements(self):
-        return [self.initials, self.short, self.given, self.middle,
+        return [self.giveni, self.short, self.given, self.middlei, self.middle,
                 self.family, self.family2]
 
     def sortkey(self):
-        return tuple(filter(bool, [self.given or self.short or self.initials,
-                                   self.middle, self.family, self.family2]))
+        return tuple(filter(bool, [self.given or self.short or self.giveni,
+                                   self.middle or self.middlei,
+                                   self.family,
+                                   self.family2]))
 
     def _initargs(self):
         return {'given': self.given,
                 'short': self.short,
-                'initials': self.initials,
+                'giveni': self.giveni,
                 'middle': self.middle,
+                'middlei': self.middlei,
                 'family': self.family,
                 'family2': self.family2}
 
@@ -433,14 +440,17 @@ class EnglishSpanishName(PersonName):
         r = []
         if self.given:
             r.append(self.given)
-            if self.initials:
-                r.append('[' + self.initials + ']')
-        elif self.initials:
-            assert not self.middle
-            r.append(self.initials)
+            if self.giveni:
+                r.append('[' + self.giveni + ']')
+        elif self.giveni:
+            r.append(self.giveni)
         if self.middle:
             assert self.given
             r.append(self.middle)
+            if self.middlei:
+                r.append('[' + self.middlei + ']')
+        elif self.middlei:
+            r.append(self.middlei)
         if self.short:
             r.append('[' + self.short + ']')
         if self.family:
@@ -452,8 +462,8 @@ class EnglishSpanishName(PersonName):
     @name_method
     def complete_name(self):
         return ' '.join(filter(bool,
-                        [self.given or self.short or self.initials,
-                         self.middle,
+                        [self.given or self.short or self.giveni,
+                         self.middle or self.middlei,
                          self.family,
                          self.family2]))
 
@@ -469,7 +479,7 @@ class EnglishSpanishName(PersonName):
 
     @name_method
     def full_name(self):
-        r = [self.given or self.initials, self.family]
+        r = [self.given or self.giveni, self.family]
         if self.family2:
             r.append(self.family2)
         return ' '.join(r)
@@ -493,10 +503,10 @@ class EnglishSpanishName(PersonName):
             r.append(' ')
             r.append(self.family2)
         r.append(', ')
-        r.append(self.given or self.initials)
-        if self.middle:
+        r.append(self.given or self.giveni)
+        if self.middle or self.middlei:
             r.append(' ')
-            r.append(self.middle)
+            r.append(self.middle or self.middlei)
         return ''.join(r)
 
 class SingleName(PersonName):
@@ -682,7 +692,7 @@ class DecoratedName(NameWrapper):
         >>> d.matches('Smith Dr')
         False
 
-        >>> n = EnglishSpanishName(initials="Z.", family="Smith")
+        >>> n = EnglishSpanishName(giveni="Z.", family="Smith")
         >>> d = DecoratedName(n, title="Dr")
         >>> unicode(d)
         u'Dr Z. Smith'

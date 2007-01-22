@@ -147,9 +147,10 @@ class Person(NamedNode):
         set('single', 'n')
         if not kw:
             set('short', 'fn-')
-            set('initials', 'fn.')
+            set('giveni', 'fn.')
             set('given', 'fn')
             set('middle', 'mn')
+            set('middlei', 'mn.')
             set('family', 'ln')
             set('family2', 'ln2')
             set('title', 'tit')
