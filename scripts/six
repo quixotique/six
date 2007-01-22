@@ -87,11 +87,17 @@ def main():
     # all nodes.
     try:
         local = None
+        localn = None
         if options.local:
             try:
                 local = model.lookup_place(options.local)
             except LookupError, e:
                 raise ArgError(e, arg=options.local)
+        elif 'SIX_LOCAL' in os.environ:
+            try:
+                local = model.lookup_place(os.environ['SIX_LOCAL'])
+            except LookupError, e:
+                raise EnvError(e, var='SIX_LOCAL')
         pred = None
         if len(args):
             for arg in args:
@@ -119,7 +125,7 @@ def main():
         except KeyError:
             raise ArgError('unsupported report %r' % options.report)
         report(options, model, pred, local, options.encoding or enc)
-    except ArgError, e:
+    except InputError, e:
         print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]), str(e))
         sys.exit(2)
 
@@ -143,7 +149,10 @@ def opt_doctest(option, opt_str, value, parser, *args, **kwargs):
             status = 1
     sys.exit(status)
 
-class ArgError(StandardError):
+class InputError(StandardError):
+    pass
+
+class ArgError(InputError):
 
     def __init__(self, msg, arg=None):
         StandardError.__init__(self, msg)
@@ -153,6 +162,19 @@ class ArgError(StandardError):
         r = []
         if self.arg is not None:
             r.append(repr(self.arg))
+        r.append(StandardError.__str__(self))
+        return ': '.join(r)
+
+class EnvError(InputError):
+
+    def __init__(self, msg, var=None):
+        StandardError.__init__(self, msg)
+        self.var = var
+
+    def __str__(self):
+        r = []
+        if self.var is not None:
+            r.append('env var %s' % self.var)
         r.append(StandardError.__str__(self))
         return ': '.join(r)
 
