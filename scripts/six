@@ -114,7 +114,7 @@ def main():
                         raise ArgError(e, arg=arg[3:])
                     p = from_node(NamedNode) & in_place(place)
                 else:
-                    p = name_matches(arg.decode(enc))
+                    p = name_imatches(arg.decode(enc))
                 if pred is None:
                     pred = p
                 else:

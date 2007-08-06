@@ -10,7 +10,7 @@ __all__ = [
         'Node', 'Link', 'NamedNode',
         'incoming', 'outgoing', 'is_link', 'is_link_only',
         'from_node', 'to_node',
-        'has_place', 'in_place', 'test_link', 'name_matches',
+        'has_place', 'in_place', 'test_link', 'name_imatches',
     ]
 
 class Node(object):
@@ -515,11 +515,15 @@ class NamedNode(Node):
         return self.sort_keys()
 
     def matches(self, text):
-        r'''Return true if any of the names of this node start with the given
-        text.
+        r'''Return true if any of the names of this node match the given text.
+        If the name has a matches() method, then use that (eg, multilang).
+        Otherwise, a simple string matches the text if it starts with the text.
         '''
         for name in self.names():
-            if name.startswith(text):
+            if hasattr(name, 'matches') and callable(name.matches):
+                if name.matches(text):
+                    return True
+            elif name.startswith(text):
                 return True
         return False
 
@@ -529,9 +533,9 @@ class NamedNode(Node):
     def __str__(self):
         return str(unicode(self))
 
-def name_matches(text):
+def name_imatches(text):
     r'''Return a predicate that selects links to named nodes whose name(s)
-    match the given text.
+    contains an inner match for the given text.
     '''
     itext = text_match_key(text)
     def _match(node, link):
@@ -539,7 +543,10 @@ def name_matches(text):
         if not isinstance(oth, NamedNode):
             return False
         for name in oth.names():
-            if itext in text_match_key(name):
+            if hasattr(name, 'imatches') and callable(name.imatches):
+                if name.imatches(itext):
+                    return True
+            elif itext in text_match_key(name):
                 return True
         return False
     return link_predicate(_match)
