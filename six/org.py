@@ -60,15 +60,24 @@ class Organisation(NamedNode):
             if tup[-1].place:
                 yield tup[-1].place
 
+    @uniq_generator
     def sort_keys(self):
-        r'''Iterate over all the sort keys that this organisation can have.
+        r'''Iterate over all the sort keys (names) that this organisation can
+        have.  If the name or any of the aka names is a multilang, then this
+        iterates over all the alternative languages in each.
         '''
         if self.prefer is not None:
-            yield self.prefer
-        if self.name != self.prefer:
+            yield unicode(self.prefer)
+        if isinstance(self.name, multilang):
+            for alt in self.name.iterunicode():
+                yield alt
+        else:
             yield self.name
         for aka in self.aka:
-            if aka != self.prefer:
+            if isinstance(aka, multilang):
+                for alt in aka.iterunicode():
+                    yield alt
+            else:
                 yield aka
 
     def __repr__(self):
