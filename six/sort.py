@@ -7,7 +7,7 @@ from itertools import imap, ifilter, chain
 from six.node import *
 from six.text import *
 
-__all__ = ['SortItem', 'Sorter', 'uniq']
+__all__ = ['SortItem', 'Sorter', 'uniq', 'uniq_generator']
 
 class Sorter(object):
     r'''A Sorter is a set-like object to which nodes may be added, and
@@ -100,3 +100,14 @@ def uniq(seq, key=None):
         if k not in u:
             yield v
             u.add(k)
+
+def uniq_generator(func, key=None):
+    r'''Decorator for generator functions to ensure that they only return
+    unique values.
+    '''
+    def newfunc(*args, **kwargs):
+        return uniq(func(*args, **kwargs), key=key)
+    newfunc.__name__ = func.__name__
+    newfunc.__doc__ = func.__doc__
+    newfunc.__module__ = func.__module__
+    return newfunc
