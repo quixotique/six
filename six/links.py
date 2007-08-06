@@ -4,6 +4,7 @@ r'''Data model - Link subclasses.
 '''
 
 from six.node import *
+from six.multilang import multilang
 
 __all__ = [
         'Is_in',
@@ -125,7 +126,7 @@ class Association(Link):
 
     def __init__(self, node1, node2, position=None, timestamp=None):
         if position is not None:
-            assert isinstance(position, basestring)
+            assert isinstance(position, (basestring, multilang))
         super(Association, self).__init__(node1, node2, timestamp=timestamp)
         self.position = position
 

@@ -5,6 +5,7 @@ r'''Data model - Organisation and Works_at.
 
 from six.node import *
 from six.sort import *
+from six.multilang import multilang
 
 __all__ = [
             'Organisation', 'Company', 'Department',
@@ -22,13 +23,14 @@ class Organisation(NamedNode):
     def __init__(self, name, aka=None, prefer=None):
         r'''
         @param name: full legal name
+        @type  name: basestring or multilang
         @param aka: other names
         @param prefer: preferred name
         '''
-        assert isinstance(name, basestring)
+        assert isinstance(name, (basestring, multilang))
         aka = list(aka) if aka is not None else []
         for a in aka:
-            assert isinstance(a, basestring)
+            assert isinstance(a, (basestring, multilang))
         if prefer is not None:
             assert prefer == name or prefer in aka
         super(Organisation, self).__init__()
@@ -116,7 +118,7 @@ class Works_at(Association):
         assert isinstance(person, Person)
         assert isinstance(org, (Organisation, Residence))
         if position is not None:
-            assert isinstance(position, basestring)
+            assert isinstance(position, (basestring, multilang))
         super(Works_at, self).__init__(person, org, position=position,
                                        timestamp=timestamp)
         self.person = person

@@ -72,6 +72,10 @@ class Tree_Text_Renderer(object):
         if self._column == 0:
             self._column = self._margin
             self._output.append(' ' * self._column)
+        # Piece of text could be a multilang, which must be converted to
+        # unicode for output.
+        if not isinstance(piece, basestring):
+            piece = unicode(piece)
         self._column += len(piece)
         if decorator:
             piece = decorator(piece)

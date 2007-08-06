@@ -76,7 +76,7 @@ class SortItem(object):
         assert isinstance(node, Node)
         self.node = node
         self.key = key
-        self.sortkey = text_sort_key(key)
+        self.sortkey = text_sort_key(unicode(key))
         self.single = single if single is not None else self
 
     def __cmp__(self, other):

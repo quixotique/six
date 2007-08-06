@@ -466,8 +466,8 @@ class ModelParser(object):
         '''
         if optional and 'co' not in part:
             return None
-        name = part.getvalue('co')
-        aka = part.mgetvalue('aka', [])
+        name = multilang.optparse(part.getvalue('co'))
+        aka = map(multilang.optparse, part.mgetvalue('aka', []))
         prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
         org = self.model.register(Company(name=name, aka=aka, prefer=prefer))
         dept = self.parse_dept(part, org=org, optional=True)
@@ -690,7 +690,7 @@ class ModelParser(object):
             if 'sequence' in kwa and hasattr(part, 'sequence'):
                 kw['sequence'] = part.sequence
             if 'position' in kwa and 'pos' in part:
-                kw['position'] = part.getvalue('pos')
+                kw['position'] = multilang.optparse(part.getvalue('pos'))
         return ltype(who, oth, **kw)
 
     def parse_assoc_contacts(self, part, ass):
