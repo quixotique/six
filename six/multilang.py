@@ -148,6 +148,43 @@ class multilang(object):
                 return True
         return False
 
+    def imatches(self, itext):
+        if hasattr(self, 'text'):
+            return itext in text_match_key(self.text)
+        for v in self.alt.itervalues():
+            if itext in text_match_key(v):
+                return True
+        return False
+
+    def loc(self):
+        r'''Return the input location of the string that was parsed to
+        produce this multilang.  If the multilang was not produced by parsing
+        input, then return None.
+
+            >>> m = multilang.parse(itext.new('"abc"', loc=5))[1]
+            >>> m.loc()
+            5
+
+            >>> m = multilang(itext.new('abc', loc=5))
+            >>> m.loc()
+            5
+
+            >>> m = multilang.parse('"abc"')[1]
+            >>> m.loc() is None
+            True
+
+            >>> m = multilang('abc')
+            >>> m.loc() is None
+            True
+        '''
+        if hasattr(self, '_parsed'):
+            return loc_of(self._parsed)
+        if hasattr(self, 'text'):
+            return loc_of(self.text)
+        if self.alt:
+            return min([loc_of(a) for a in self.alt.itervalues()])
+        return None
+
     _re_parse = re.compile(r'(?:([a-z]{2}):)?"([^"]*)"\s*')
 
     @classmethod
@@ -170,6 +207,7 @@ class multilang(object):
             InputError: column 12: bare text mixed with language text
 
         '''
+        otext = text
         bare = None
         alt = None
         while text:
@@ -196,8 +234,24 @@ class multilang(object):
                     raise InputError('bare text mixed with language text',
                                      char=m.group())
                 bare = string
+        obj = None
         if bare is not None:
-            return text, class_(bare)
-        if alt is not None:
-            return text, class_(**alt)
-        return (text, None)
+            obj = class_(bare)
+        elif alt is not None:
+            obj = class_(**alt)
+        if obj is not None:
+            obj._parsed = otext
+        return (text, obj)
+
+    @classmethod
+    def optparse(class_, text):
+        r'''Parse a string as a complete multilang, or if that fails, then
+        just as a plain string.  Don't accept a mixture.
+        '''
+        t, m = class_.parse(text)
+        if m is None:
+            return text
+        if t:
+            raise InputError('multilang mixed with plain text',
+                             char=text)
+        return m
