@@ -468,6 +468,7 @@ class ModelParser(object):
             return None
         name = multilang.optparse(part.getvalue('co'))
         aka = map(multilang.optparse, part.mgetvalue('aka', []))
+        # The preferred name is the one that appears first in the input.
         prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
         org = self.model.register(Company(name=name, aka=aka, prefer=prefer))
         dept = self.parse_dept(part, org=org, optional=True)
