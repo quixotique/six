@@ -299,6 +299,7 @@ def report_phone(options, model, predicate, local, encoding):
             if isinstance(node, Person):
                 tree.add(unicode(node), underline=True)
                 tree.nl()
+                dump_comments(node, sub)
                 telephones(node, sub, **tkw)
                 for tup in node.find_nodes(
                         (outgoing & is_link(Belongs_to)) |
@@ -308,6 +309,7 @@ def report_phone(options, model, predicate, local, encoding):
             elif isinstance(node, Family):
                 tree.add(unicode(node), underline=True)
                 tree.nl()
+                dump_comments(node, sub)
                 telephones(node, sub, **tkw)
                 for tup in node.find_nodes(outgoing & is_link(Resides_at)):
                     comment = []
@@ -332,6 +334,7 @@ def report_phone(options, model, predicate, local, encoding):
                     if link:
                         tree.add(', ', unicode(link.company))
                 tree.nl()
+                dump_comments(node, sub)
                 telephones(node, sub, **tkw)
                 telephones_org(node, sub, **tkw)
                 for dept in node.nodes(outgoing & is_link(Has_department)):
