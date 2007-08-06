@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.4
+#!/usr/bin/env python2.5
 # vim: sw=4 sts=4 et fileencoding=latin1 nomod
 
 '''Run the doctests in all of the listed modules.  If a module search path is
@@ -188,26 +188,33 @@ def report_dump(options, model, predicate, local, encoding):
     from six.output import Treebuf
     tree = Treebuf(local=local)
     seen = set(sorter)
+    last = None
     for group in sorter.sorted():
         for item in group:
-            tree.nl()
             if item is not item.single:
-                tree.add(item.key, ' -> ', item.single.key)
-                tree.nl()
+                if item.single is not last:
+                    tree.nl()
+                    tree.add(item.key, ' -> ', item.single.key)
+                    tree.nl()
             elif isinstance(item.node, Family):
+                tree.nl()
                 dump_name(item.node, tree)
                 dump_family(item.node, tree.sub(), seen)
             elif isinstance(item.node, Person):
+                tree.nl()
                 dump_name(item.node, tree)
                 dump_person(item.node, tree.sub(), seen)
             elif isinstance(item.node, Department):
                 com = item.node.node(incoming & is_link(Has_department))
+                tree.nl()
                 dump_name(item.node, tree,
                           qual=(', ', unicode(com)) if com else None)
                 dump_organisation(item.node, tree.sub(), seen)
             elif isinstance(item.node, Organisation):
+                tree.nl()
                 dump_name(item.node, tree)
                 dump_organisation(item.node, tree.sub(), seen)
+            last = item.single
     print unicode(tree).encode(encoding, 'replace')
 
 def report_email(options, model, predicate, local, encoding):
