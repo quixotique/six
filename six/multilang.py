@@ -131,6 +131,26 @@ class multilang(object):
                 pass
         raise ValueError('text has no form in language %r' % lang)
 
+    def iterunicode(self, lang=None):
+        r'''Iterates over all the texts in all languages, starting with the
+        given language, or if not specified, the language of the current
+        locale, followed by all other languages in undefined order.
+        '''
+        first = None
+        if lang is not None:
+            try:
+                first = self.local(lang)
+                yield first
+            except KeyError:
+                pass
+        if hasattr(self, 'text'):
+            if self.text != first:
+                yield self.text
+        else:
+            for alt in self.alt.itervalues():
+                if alt != first:
+                    yield alt
+
     def __repr__(self):
         classname = self.__class__.__name__
         if hasattr(self, 'text'):
