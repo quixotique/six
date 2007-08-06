@@ -69,13 +69,13 @@ class Organisation(NamedNode):
         if self.prefer is not None:
             yield unicode(self.prefer)
         if isinstance(self.name, multilang):
-            for alt in self.name.iterunicode():
+            for alt in self.name.itertexts():
                 yield alt
         else:
             yield self.name
         for aka in self.aka:
             if isinstance(aka, multilang):
-                for alt in aka.iterunicode():
+                for alt in aka.itertexts():
                     yield alt
             else:
                 yield aka
