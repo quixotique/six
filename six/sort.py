@@ -21,6 +21,8 @@ class Sorter(object):
         self._sorted = None
 
     def update(self, nodes):
+        r'''Append the given Nodes to the sorter.
+        '''
         for node in nodes:
             assert isinstance(node, Node)
             if node not in self._nodes:
@@ -28,15 +30,28 @@ class Sorter(object):
                 self._items = None
 
     def discard(self, node):
+        r'''Remove the given Node from the sorter.
+        '''
         self._nodes.discard(node)
 
     def __iter__(self):
+        r'''Iterate over all the nodes added to date, in arbitrary order.
+        '''
         return iter(self._nodes)
 
     def __contains__(self, node):
+        r'''Return true if the given Node has been added to the sorter and not
+        discarded since.
+        '''
         return node in self._nodes
 
     def items(self):
+        r'''Iterate over SortItem objects for all Nodes in the sorter, in
+        arbitrary order.  There will be at least one SortItem for each Node.
+        The 'single' attribute of each SortItem will always refer to the
+        principal SortItem for that Node, which corresponds to the first key
+        returned by the Node's sort_keys() method.
+        '''
         if self._items is None:
             self._items = set()
             for node in self._nodes:
@@ -52,6 +67,9 @@ class Sorter(object):
         return iter(self._items)
 
     def sorted(self):
+        r'''Iterate over all SortItems, as iterated by items(), in sorted
+        order.
+        '''
         if self._sorted is None:
             self._sorted = list(self.items())
             self._sorted.sort()
@@ -77,6 +95,8 @@ class SortItem(object):
         assert isinstance(node, Node)
         self.node = node
         self.key = key
+        # The key could be a multilang, so we must ensure it is a string for
+        # collation purposes.
         self.sortkey = text_sort_key(unicode(key))
         self.single = single if single is not None else self
 
