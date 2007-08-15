@@ -35,7 +35,7 @@ class Sorter(object):
         self._nodes.discard(node)
 
     def __iter__(self):
-        r'''Iterate over all the nodes added to date, in arbitrary order.
+        r'''Iterate over all the Nodes added to date, in arbitrary order.
         '''
         return iter(self._nodes)
 
@@ -67,18 +67,12 @@ class Sorter(object):
         return iter(self._items)
 
     def sorted(self):
-        r'''Iterate over all SortItems, as iterated by items(), in sorted
-        order.
+        r'''Iterate over SortItems, in sorted order.
         '''
         if self._sorted is None:
             self._sorted = list(self.items())
             self._sorted.sort()
-        sorted = list(self._sorted)
-        while sorted:
-            items = [sorted.pop(0)]
-            while sorted and sorted[0].node is items[0].node:
-                items.append(sorted.pop(0))
-            yield tuple(items)
+        return iter(self._sorted)
 
 class SortItem(object):
     r'''When sorting nodes, one node may appear in several places in the
