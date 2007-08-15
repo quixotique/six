@@ -406,6 +406,7 @@ from six.email import *
 from six.keyword import *
 from six.data import *
 from six.comment import *
+from six.uniq import uniq
 
 def dump_name(node, tree, qual=None):
     prefix = ''

@@ -5,6 +5,7 @@ r'''Data model - Organisation and Works_at.
 
 from six.node import *
 from six.sort import *
+from six.uniq import uniq_generator
 from six.multilang import multilang
 
 __all__ = [

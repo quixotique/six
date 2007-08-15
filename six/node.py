@@ -5,6 +5,7 @@ r'''Data model - Node and Link superclasses, and link predicate algebra.
 
 import datetime
 from six.text import *
+from six.uniq import uniq
 
 __all__ = [
         'Node', 'Link', 'NamedNode',
@@ -41,7 +42,6 @@ class Node(object):
         r'''Iterate over all the places (areas and/or countries) to which this
         node pertains, based on its links to other nodes.
         '''
-        from six.sort import uniq
         return uniq(self._all_places())
 
     def _all_places(self):
