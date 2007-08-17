@@ -104,10 +104,26 @@ class Person(NamedNode):
         try:
             return self.name.familiar_name()
         except ValueError:
-            try:
-                return self.name.casual_name()
-            except ValueError:
-                return self.name.complete_name()
+            return self.family_head_name()
+
+    def family_head_name(self):
+        r'''Return the person's name as used in a the context as the head of a
+        family.  This is used for forming the name of a family.
+        '''
+        try:
+            return self.name.casual_name() # given-name surname if known
+        except ValueError:
+            return self.name.complete_name() # else as much as we know
+
+    def full_name_known(self):
+        r'''Used when ordering the heads of a family -- those whose full names
+        are known come first.
+        '''
+        try:
+            self.name.full_name()
+            return True
+        except ValueError:
+            return False
 
     def birthday(self):
         try:
