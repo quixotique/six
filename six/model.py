@@ -297,7 +297,7 @@ class ModelParser(object):
         else:
             assert len(parts) > 1
             if '=' not in parts:
-                raise InputError('missing "=" part', line=parts[''][0])
+                raise InputError('missing "=" part', line=block[0])
             if len(parts['=']) > 1:
                     raise InputError('duplicate "=" part',
                                      line=parts['='][1].delim)
@@ -368,9 +368,6 @@ class ModelParser(object):
                 self.parse_residences(members[0], dept)
             per = self.parse_person(members[0], optional=bool(dept),
                                     principal=members[0].delim == '+')
-            if not dept:
-                assert per
-                self.parse_residences(common, per)
             # Now that all the named nodes are registered, we can parse contact
             # details (which might suspend in find()).
             self.parse_org_con(common, org)
@@ -392,7 +389,7 @@ class ModelParser(object):
             if org:
                 self.parse_residences(common, org)
             else:
-                fam = self.model.register(Family())
+                fam = Family()
                 self.parse_residences(common, fam)
             for member in members:
                 member.dept = None
@@ -432,6 +429,12 @@ class ModelParser(object):
                                timestamp=member.updated or common.updated)
                     self.parse_contacts_work(member, member.person)
                 self.parse_person_con(member, member.person, member.dept)
+            # Register a Family object only after all members have been added,
+            # because the result of Family.matches(), which is invoked through
+            # find(), depends on the members, and if we registered it earlier,
+            # then it could potentially match where it shouldn't.
+            if not org:
+                self.model.register(fam)
         # Now find lines that were not parsed, and complain about them.
         missed = set()
         for part in chain([common], members):
