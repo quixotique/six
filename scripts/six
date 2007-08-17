@@ -253,38 +253,34 @@ def report_dump(options, model, predicate, local, encoding):
     # Now format the report.
     from six.output import Treebuf
     tree = Treebuf(local=local)
-    for group in uniqa_group(ifilter(lambda i: True or i.node, sorted),
-                             key=lambda i: i.node):
-        for item in group:
-            if item.node is None:
-                tree.nl()
-                tree.add(item.key, ' OMITTED')
-                tree.nl()
-            elif item is not item.single:
-                tree.nl()
-                tree.add(item.key, ' -> ', item.single.key)
-                tree.nl()
-            elif isinstance(item.node, Person):
-                tree.nl()
-                dump_name(item.node, tree)
-                dump_person(item.node, tree.sub(), seen)
-            elif isinstance(item.node, Family):
-                tree.nl()
-                dump_name(item.node, tree)
-                dump_family(item.node, tree.sub(),
-                            seen - see_in_family.get(item.node, set()))
-            elif isinstance(item.node, Department):
-                com = item.node.node(incoming & is_link(Has_department))
-                tree.nl()
-                dump_name(item.node, tree,
-                          qual=(', ', unicode(com)) if com else None)
-                dump_organisation(item.node, tree.sub(),
-                                  seen - see_in_org.get(item.node, set()))
-            elif isinstance(item.node, Organisation):
-                tree.nl()
-                dump_name(item.node, tree)
-                dump_organisation(item.node, tree.sub(),
-                                  seen - see_in_org.get(item.node, set()))
+    for item in sorted:
+        if item.node is None:
+            pass
+        elif item is not item.single:
+            tree.nl()
+            tree.add(item.key, ' -> ', item.single.key)
+            tree.nl()
+        elif isinstance(item.node, Person):
+            tree.nl()
+            dump_name(item.node, tree)
+            dump_person(item.node, tree.sub(), seen)
+        elif isinstance(item.node, Family):
+            tree.nl()
+            dump_name(item.node, tree)
+            dump_family(item.node, tree.sub(),
+                        seen - see_in_family.get(item.node, set()))
+        elif isinstance(item.node, Department):
+            com = item.node.node(incoming & is_link(Has_department))
+            tree.nl()
+            dump_name(item.node, tree,
+                      qual=(', ', unicode(com)) if com else None)
+            dump_organisation(item.node, tree.sub(),
+                              seen - see_in_org.get(item.node, set()))
+        elif isinstance(item.node, Organisation):
+            tree.nl()
+            dump_name(item.node, tree)
+            dump_organisation(item.node, tree.sub(),
+                              seen - see_in_org.get(item.node, set()))
     print unicode(tree).encode(encoding, 'replace')
 
 def report_email(options, model, predicate, local, encoding):
@@ -473,7 +469,7 @@ from six.email import *
 from six.keyword import *
 from six.data import *
 from six.comment import *
-from six.uniq import uniq, uniqa_group
+from six.uniq import uniq
 
 def dump_name(node, tree, qual=None):
     prefix = ''
