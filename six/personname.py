@@ -850,7 +850,6 @@ class DecoratedName(NameWrapper):
 
     @defer_to_wrapped
     def complete_name(self):
-        return ', '.join(filter(bool, [self.honorific or self.title,
-                                       self._wrapped.complete_name(),
+        return ', '.join(filter(bool, [' '.join([self.honorific or self.title,
+                                                self._wrapped.complete_name()]),
                                        self.letters]))
-
