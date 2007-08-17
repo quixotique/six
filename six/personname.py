@@ -444,8 +444,13 @@ class EnglishSpanishName(PersonName):
         self.family2 = family2 and family2.strip()
 
     def _elements(self):
-        return [self.giveni, self.short, self.given, self.middlei, self.middle,
-                self.family, self.family2]
+        yield self.giveni
+        yield self.short
+        yield self.given
+        yield self.middlei
+        yield self.middle
+        yield self.family
+        yield self.family2
 
     def sortkey(self):
         return tuple(filter(bool, [self.given or self.short or self.giveni,
@@ -560,7 +565,7 @@ class SingleName(PersonName):
         self.single = single and single.strip()
 
     def _elements(self):
-        return [self.single]
+        yield self.single
 
     def sortkey(self):
         return self.single,
@@ -791,9 +796,12 @@ class DecoratedName(NameWrapper):
         self.letters = letters and letters.strip()
 
     def _elements(self):
-        return [self.title, self.salutation, self.honorific] + \
-               self._wrapped._elements() + \
-               [self.letters]
+        yield self.title
+        yield self.salutation
+        yield self.honorific
+        for e in self._wrapped._elements():
+            yield e
+        yield self.letters
 
     def _initargs(self):
         r = {'title': self.title,
