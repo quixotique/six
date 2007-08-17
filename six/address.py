@@ -165,7 +165,7 @@ class Address(Node):
         else:
             raise InputError('missing country', char=text)
         assert isinstance(country, Country)
-        if len(lines) < 2:
+        if not lines:
             raise InputError('address too short', char=text)
         area = None
         try:
