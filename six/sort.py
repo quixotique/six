@@ -28,11 +28,15 @@ class Sorter(object):
             if node not in self._nodes:
                 self._nodes.add(node)
                 self._items = None
+                self._sorted = None
 
     def discard(self, node):
         r'''Remove the given Node from the sorter.
         '''
-        self._nodes.discard(node)
+        if node in self._nodes:
+            self._nodes.remove(node)
+            self._items = None
+            self._sorted = None
 
     def __iter__(self):
         r'''Iterate over all the Nodes added to date, in arbitrary order.
@@ -53,17 +57,14 @@ class Sorter(object):
         returned by the Node's sort_keys() method.
         '''
         if self._items is None:
+            self._sorted = None
             self._items = set()
-            for node in self._nodes:
-                keys = list(uniq(node.sort_keys()))
-                assert keys
-                items = [SortItem(node, key) for key in keys]
-                single = items[0]
+            for node in self:
+                items = [SortItem(node, key) for key in uniq(node.sort_keys())]
+                assert items
                 for item in items:
-                    assert isinstance(item, SortItem)
-                    item.single = single
+                    item.single = items[0]
                     self._items.add(item)
-                    self._sorted = None
         return iter(self._items)
 
     def sorted(self):
