@@ -55,12 +55,6 @@ class Belongs_to(Link):
     def only_place(self):
         return self.family.only_place()
 
-    def __cmp__(self, other):
-        if not isinstance(other, Belongs_to):
-            return NotImplemented
-        return (cmp(self.sequence or 0, other.sequence or 0) or
-                cmp(self.person.sortkey(), other.person.sortkey()))
-
 class Resides_at(Link):
 
     r'''Indicates that the person, family, or organisation resides at a given
