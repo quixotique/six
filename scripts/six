@@ -189,9 +189,13 @@ def report_dump(options, model, predicate, local, encoding):
     # predicate.
     sorter = Sorter()
     sorter.update(model.nodes(predicate))
-    # Add nodes that are implied by the predicate: a selected family implies
-    # all its members, and a selected organisation implies all its departments
-    # and the people who work for it and its departments.
+    # Add nodes that are implied by the predicate:
+    # - A selected company imples all its departments, and a selected
+    #   department implies its company.
+    # - A selected family implies all its members, and an organisation
+    #   implies the people who work for it.
+    for node in list(sorter):
+        sorter.update(node.nodes(is_link(Has_department)))
     for node in list(sorter):
         sorter.update(node.nodes(incoming &
                                  (is_link(Belongs_to) | is_link(Works_at))))
