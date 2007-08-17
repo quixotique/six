@@ -82,7 +82,7 @@ class Organisation(NamedNode):
                 yield aka
 
     def __repr__(self):
-        r = ['name=%r' % self.name, 'aka=%r' % map(str, self.aka)]
+        r = ['name=%r' % self.name, 'aka=%r' % map(unicode, self.aka)]
         if self.prefer is not None:
             r.append('prefer=%r' % self.prefer)
         return '%s(%s)' % (self.__class__.__name__, ', '.join(r))
@@ -121,7 +121,7 @@ class Works_at(Association):
     and that the person may represent the organisation in some way.
     '''
 
-    def __init__(self, person, org, position=None, sequence=None,
+    def __init__(self, person, org, position=None, is_head=False, sequence=None,
                        timestamp=None):
         from six.person import Person
         from six.address import Residence
@@ -133,6 +133,7 @@ class Works_at(Association):
                                        timestamp=timestamp)
         self.person = person
         self.org = org
+        self.is_head = bool(is_head)
         self.sequence = sequence
 
     def __cmp__(self, other):
@@ -140,3 +141,11 @@ class Works_at(Association):
             return NotImplemented
         return (cmp(self.sequence or 0, other.sequence or 0) or
                 cmp(self.person.sortkey(), other.person.sortkey()))
+
+    def __repr__(self):
+        r = ['person=%r' % self.person,
+             'org=%r' % self.org,
+             'is_head=%r' % self.is_head,
+             'sequence=%r' % self.sequence,]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(r))
+

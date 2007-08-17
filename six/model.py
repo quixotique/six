@@ -685,12 +685,14 @@ class ModelParser(object):
         with suitable constructor data.
         '''
         assert issubclass(ltype, Association)
-        # Here we should introspect the keyword args accepted by
-        # ltype() and adapt accordingly.  One day.
+        # Here we introspect the keyword args accepted by ltype's constructor
+        # and adapt accordingly.
         kw = {'timestamp': timestamp}
         if part:
             import inspect
             kwa = dict.fromkeys(inspect.getargspec(ltype.__init__)[0])
+            if 'is_head' in kwa and hasattr(part, 'delim'):
+                kw['is_head'] = part.delim != '-'
             if 'sequence' in kwa and hasattr(part, 'sequence'):
                 kw['sequence'] = part.sequence
             if 'position' in kwa and 'pos' in part:
