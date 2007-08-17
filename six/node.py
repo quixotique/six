@@ -11,7 +11,8 @@ __all__ = [
         'Node', 'Link', 'NamedNode',
         'incoming', 'outgoing', 'is_link', 'is_link_only',
         'from_node', 'to_node',
-        'has_place', 'in_place', 'test_link', 'name_imatches',
+        'has_place', 'in_place', 'test_link', 'test_link_attr',
+        'name_imatches',
     ]
 
 class Node(object):
@@ -499,10 +500,16 @@ def in_place(place):
     return test_is_in
 
 def test_link(func):
+    r'''Return a predicate that selects links which satisfy a given function
+    that takes the link as its single argument.
+    '''
+    return link_predicate(lambda node, link: func(link))
+
+def test_link_attr(name):
     r'''Return a predicate that selects links with a given named attribute with
     a given value.
     '''
-    return link_predicate(lambda node, link: func(link))
+    return test_link(lambda link: getattr(link, name, False))
 
 class NamedNode(Node):
 
