@@ -258,18 +258,18 @@ class EnglishSpanishName(PersonName):
                             Given   Middle  Family  Family2
         Legal name           y      [y]      y      [y]
         Full name           (i)     (i)      y      [y]
-        Casual name         (ii)    (ii)     y       -
         Familiar name       (ii)    (ii)     -       -
-        Title name           -       -       y       -
-        Collation name      (i)      [y]     y      [y]
+        Casual name         (ii)    (ii)     y       -
+        Title name           -       -       y      [y]
+        Collation name      (i)     [y]      y      [y]
 
-    [y] Only used if known.
-
-    (i) If the given/middle name is not known in these cases, then initials are
-    used, if known.
-
+    y    Used; failure if unknown.
+    [y]  Used if known.
+    (i)  If the given/middle name is not known in these cases, then initials
+         are used, if known.
     (ii) The given/middle name(s) used in these cases are the contracted
-    (short) form, if known.  If only the initials are known, they are not used.
+         (short) form, if known.  If only the initials are known, they are not
+         used.
 
     Note that for Anglic names, which only have a single family name, the full
     name and casual name forms are the same if there is no contracted given
@@ -349,6 +349,37 @@ class EnglishSpanishName(PersonName):
 
         >>> eval(repr(n)) == n
         True
+
+        >>> n = EnglishSpanishName(given="Zacharias", short="Zack")
+        >>> n.complete_name()
+        'Zacharias'
+        >>> n.legal_name()
+        Traceback (most recent call last):
+        ValueError: no legal name for Zacharias [Zack]
+        >>> n.full_name()
+        Traceback (most recent call last):
+        ValueError: no full name for Zacharias [Zack]
+        >>> n.casual_name()
+        Traceback (most recent call last):
+        ValueError: no casual name for Zacharias [Zack]
+        >>> n.familiar_name()
+        'Zack'
+        >>> n.social_name()
+        Traceback (most recent call last):
+        ValueError: no social name for Zacharias [Zack]
+        >>> n.formal_name()
+        Traceback (most recent call last):
+        ValueError: no formal name for Zacharias [Zack]
+        >>> n.formal_salutation_name()
+        Traceback (most recent call last):
+        ValueError: no formal salutation name for Zacharias [Zack]
+        >>> n.collation_name()
+        Traceback (most recent call last):
+        ValueError: no collation name for Zacharias [Zack]
+        >>> unicode(n)
+        u'Zacharias [Zack]'
+        >>> str(n)
+        'Zacharias [Zack]'
 
     '''
 
@@ -485,16 +516,19 @@ class EnglishSpanishName(PersonName):
         return ' '.join(r)
 
     @name_method
-    def casual_name(self):
-        return ' '.join([self.short or self.given, self.family])
-
-    @name_method
     def familiar_name(self):
         return self.short or self.given
 
     @name_method
+    def casual_name(self):
+        return ' '.join([self.short or self.given, self.family])
+
+    @name_method
     def title_name(self):
-        return self.family
+        r = [self.family]
+        if self.family2:
+            r.append(self.family2)
+        return ' '.join(r)
 
     @name_method
     def collation_name(self):
