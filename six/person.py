@@ -79,7 +79,15 @@ class Person(NamedNode):
 
     def names(self):
         r'''Iterate over all the names that this person may be listed under.
+        The first one is the person's complete name.  If the person has a
+        formal name, then that follows.  Otherwise, use the person's casual
+        name.  If that is not known, then try their familiar name.  If that is
+        not known either, then try their full name.
         '''
+        try:
+            yield self.name.complete_name()
+        except ValueError:
+            pass
         try:
             yield self.name.formal_name()
         except ValueError:
@@ -93,10 +101,6 @@ class Person(NamedNode):
                         yield self.name.full_name()
                     except ValueError:
                         pass
-        try:
-            yield self.name.complete_name()
-        except ValueError:
-            pass
 
     def familiar_name(self):
         r'''Return the person's name as used in a familiar context.

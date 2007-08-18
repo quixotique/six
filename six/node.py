@@ -516,11 +516,6 @@ class NamedNode(Node):
     r'''A node with one or more names.
     '''
 
-    def name(self):
-        r'''The principal name that this node will be listed under.
-        '''
-        return self.names().next()
-
     def names(self):
         r'''Iterate over all the names that this node may be listed under.
         '''

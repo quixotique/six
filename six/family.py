@@ -20,7 +20,7 @@ class Family(NamedNode):
     the family, which correspond to the people with "+" delimiters.
     '''
 
-    def name(self, first=None):
+    def _name(self, first=None):
         r'''Form the name of the family from the names of all the heads of
         family, in order.  If the 'first' argument is given, then place that
         person at the front of the name.
@@ -98,7 +98,7 @@ class Family(NamedNode):
         Then the collation name (if known) of each head.
         '''
         for head in self.heads():
-            yield self.name(head)
+            yield self._name(head)
         coll = defaultdict(list)
         for head in self.heads():
             try:
@@ -117,7 +117,7 @@ class Family(NamedNode):
         alternate names for the family, but just with the order of the names
         swapped, which is of no use to anyone.
         '''
-        yield self.name()
+        yield self._name()
 
     def matches(self, text):
         r'''Return true if the name of this family matches the given text.

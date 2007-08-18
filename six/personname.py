@@ -256,6 +256,7 @@ class EnglishSpanishName(PersonName):
     name.
 
                             Given   Middle  Family  Family2
+        Complete name       (i)     (i)     [y]     [y]
         Legal name           y      [y]      y      [y]
         Full name           (i)     (i)      y      [y]
         Familiar name       (ii)    (ii)     -       -
@@ -471,7 +472,8 @@ class EnglishSpanishName(PersonName):
         r'''The default string representation of a name contains almost all
         known elements, but it is not necessarily how one would normally write
         the name, because it may mix casual and formal parts not normally used
-        together.
+        together, and will show words and their initials together if both are
+        known.
         '''
         r = []
         if self.given:
