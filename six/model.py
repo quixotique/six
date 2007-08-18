@@ -362,12 +362,14 @@ class ModelParser(object):
             # person and/or department.
             org = self.parse_org(common, optional=False)
             self.parse_residences(common, org)
-            dept = self.parse_dept(members[0], optional=True)
-            if dept:
-                Has_department(org, dept)
-                self.parse_residences(members[0], dept)
+            dept = self.parse_dept(members[0], org, optional=True,
+                                   with_aka=True)
             per = self.parse_person(members[0], optional=bool(dept),
                                     principal=members[0].delim == '+')
+            if dept:
+                self.parse_residences(members[0], dept)
+            elif per:
+                self.parse_residences(members[0], per)
             # Now that all the named nodes are registered, we can parse contact
             # details (which might suspend in find()).
             self.parse_org_con(common, org)
@@ -394,15 +396,12 @@ class ModelParser(object):
             for member in members:
                 member.dept = None
                 if org:
-                    member.dept = self.parse_dept(member, optional=True)
-                if member.dept:
-                    Has_department(org, member.dept)
-                    self.parse_residences(member, member.dept)
+                    member.dept = self.parse_dept(member, org, optional=True,
+                                                  with_aka=True)
                 member.person = self.parse_person(member,
                                                   optional=bool(member.dept),
                                                   principal=member.delim != '-')
-                if not member.dept:
-                    self.parse_residences(member, member.person)
+                self.parse_residences(member, member.dept or member.person)
             # Now that all the named nodes are registered, we can parse contact
             # details (which might suspend in find()).
             if org:
@@ -474,21 +473,24 @@ class ModelParser(object):
         # The preferred name is the one that appears first in the input.
         prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
         org = self.model.register(Company(name=name, aka=aka, prefer=prefer))
-        dept = self.parse_dept(part, org=org, optional=True)
-        if dept:
-            Has_department(org, dept)
-            org = dept
-        return org
+        dept = self.parse_dept(part, org, optional=True, with_aka=False)
+        return dept if dept else org
 
-    def parse_dept(self, part, org=None, optional=False):
-        r'''Parse a department.
+    def parse_dept(self, part, org, optional=False, with_aka=False):
+        r'''Parse a department and connect it to its parent organisation.
         '''
         if optional and 'de' not in part:
             return None
         name = part.getvalue('de')
-        aka = part.mgetvalue('aka', []) if not org else []
+        aka = part.mgetvalue('aka', []) if with_aka else []
         prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
-        return self.model.register(Department(name=name, aka=aka, prefer=prefer))
+        dept = self.model.register(Department(name=name, aka=aka,
+                                              prefer=prefer))
+        try:
+            Has_department(org, dept)
+        except ValueError, e:
+            raise InputError(e, line=name)
+        return dept
 
     def parse_org_con(self, part, org):
         r'''Parse contact details that may be associated with an organisation

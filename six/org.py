@@ -16,7 +16,7 @@ __all__ = [
 
 class Organisation(NamedNode):
 
-    r'''An organisation is a company or department or division thereor, or any
+    r'''An organisation is a company or department or division thereof, or any
     other named (usually incorporated) entity, where people work or can be
     contacted, or which provide context for personal data.
     '''
@@ -102,11 +102,16 @@ class Company(Organisation):
 class Has_department(Link):
 
     r'''The only possible relationship between a Company and a Department.
+    A department can only belong to a single company.
     '''
 
     def __init__(self, company, dept, timestamp=None):
         assert isinstance(company, Company)
         assert isinstance(dept, Department)
+        dups = list(dept.links(incoming & is_link(Has_department)))
+        if dups:
+            raise ValueError('%s is already a department of %s' %
+                             unicode(dups[0].dept), unicode(dups[0].company))
         super(Has_department, self).__init__(company, dept, timestamp=timestamp)
         self.company = company
         self.dept = dept
