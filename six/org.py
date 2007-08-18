@@ -29,14 +29,10 @@ class Organisation(NamedNode):
         @param prefer: preferred name
         '''
         assert isinstance(name, (basestring, multilang))
-        aka = list(aka) if aka is not None else []
-        for a in aka:
-            assert isinstance(a, (basestring, multilang))
         if prefer is not None:
             assert prefer == name or prefer in aka
-        super(Organisation, self).__init__()
+        super(Organisation, self).__init__(aka=aka)
         self.name = name
-        self.aka = aka
         self.prefer = prefer
 
     def only_place(self):
@@ -62,27 +58,17 @@ class Organisation(NamedNode):
                 yield tup[-1].place
 
     @uniq_generator
-    def sort_keys(self):
-        r'''Iterate over all the sort keys (names) that this organisation can
-        have.  If the name or any of the aka names is a multilang, then this
-        iterates over all the alternative languages in each.
+    def names(self):
+        r'''Iterate over all the names that this organisation can have.
         '''
-        if self.prefer is not None:
-            yield unicode(self.prefer)
-        if isinstance(self.name, multilang):
-            for alt in self.name.itertexts():
-                yield alt
-        else:
-            yield self.name
-        for aka in self.aka:
-            if isinstance(aka, multilang):
-                for alt in aka.itertexts():
-                    yield alt
-            else:
-                yield aka
+        if self.prefer:
+            yield self.prefer
+        yield self.name
+        for name in self.aka:
+            yield name
 
     def __repr__(self):
-        r = ['name=%r' % self.name, 'aka=%r' % map(unicode, self.aka)]
+        r = ['name=%r' % self.name, 'aka=%r' % map(repr, self.aka)]
         if self.prefer is not None:
             r.append('prefer=%r' % self.prefer)
         return '%s(%s)' % (self.__class__.__name__, ', '.join(r))

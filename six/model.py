@@ -331,7 +331,7 @@ class ModelParser(object):
             # "common" could be a company, or person, or both, or if
             # neither then it must define a residence.  Never a family.
             org = self.parse_org(common, optional=True)
-            per = self.parse_person(common, optional=True,
+            per = self.parse_person(common, optional=True, with_aka=not org,
                                     principal=False if org else True)
             if org:
                 self.parse_residences(common, org)
@@ -365,7 +365,8 @@ class ModelParser(object):
             dept = self.parse_dept(members[0], org, optional=True,
                                    with_aka=True)
             per = self.parse_person(members[0], optional=bool(dept),
-                                    principal=members[0].delim == '+')
+                                    principal=members[0].delim == '+',
+                                    with_aka=not dept)
             if dept:
                 self.parse_residences(members[0], dept)
             elif per:
@@ -400,7 +401,8 @@ class ModelParser(object):
                                                   with_aka=True)
                 member.person = self.parse_person(member,
                                                   optional=bool(member.dept),
-                                                  principal=member.delim != '-')
+                                                  principal=member.delim != '-',
+                                                  with_aka=not member.dept)
                 self.parse_residences(member, member.dept or member.person)
             # Now that all the named nodes are registered, we can parse contact
             # details (which might suspend in find()).
@@ -482,7 +484,9 @@ class ModelParser(object):
         if optional and 'de' not in part:
             return None
         name = part.getvalue('de')
-        aka = part.mgetvalue('aka', []) if with_aka else []
+        aka = []
+        if with_aka:
+            aka = map(multilang.optparse, part.mgetvalue('aka', []))
         prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
         dept = self.model.register(Department(name=name, aka=aka,
                                               prefer=prefer))
@@ -569,7 +573,8 @@ class ModelParser(object):
             self.parse_data(sub, fam)
         return fam
 
-    def parse_person(self, part, optional=False, principal=True):
+    def parse_person(self, part, optional=False, with_aka=False,
+                                 principal=True):
         r'''Parse a person's name and other details into a Person node.
         '''
         pn = Person.initargs(part)
@@ -577,7 +582,11 @@ class ModelParser(object):
             if optional:
                 return None
             raise InputError('missing person', line=part)
-        per = self.model.register(Person.from_initargs(pn), principal=principal)
+        aka = None
+        if with_aka:
+            aka = map(multilang.optparse, part.mgetvalue('aka', []))
+        per = self.model.register(Person.from_initargs(pn, aka=aka),
+                                  principal=principal)
         # Birthday.
         if 'bd' in part:
             birthday, year = Birthday.parse(part.getvalue('bd'))

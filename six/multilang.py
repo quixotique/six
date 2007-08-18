@@ -8,7 +8,7 @@ import re
 from six.input import *
 from six.text import *
 
-__all__ = ['multilang']
+__all__ = ['multilang', 'expand_multilang_generator']
 
 class multilang(object):
 
@@ -275,3 +275,28 @@ class multilang(object):
             raise InputError('multilang mixed with plain text',
                              char=text)
         return m
+
+def expand_multilang_generator(func):
+    r'''Decorator for generator functions that expands every multilang object
+    into its alternative texts.
+
+        >>> @expand_multilang_generator
+        ... def f():
+        ...     yield multilang(en='Spain', es=u'España')
+        ...     yield 'Australia'
+        ...     yield multilang(en='Germany', es='Alemania')
+        >>> list(f())
+        ['Spain', u'Espa\xf1a', 'Australia', 'Germany', 'Alemania']
+
+    '''
+    def newfunc(*args, **kwargs):
+        for value in func(*args, **kwargs):
+            if isinstance(value, multilang):
+                for alt in value.itertexts():
+                    yield alt
+            else:
+                yield value
+    newfunc.__name__ = func.__name__
+    newfunc.__doc__ = func.__doc__
+    newfunc.__module__ = func.__module__
+    return newfunc

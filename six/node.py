@@ -5,7 +5,8 @@ r'''Data model - Node and Link superclasses, and link predicate algebra.
 
 import datetime
 from six.text import *
-from six.uniq import uniq
+from six.uniq import uniq, uniq_generator
+from six.multilang import *
 
 __all__ = [
         'Node', 'Link', 'NamedNode',
@@ -516,10 +517,29 @@ class NamedNode(Node):
     r'''A node with one or more names.
     '''
 
-    def names(self):
-        r'''Iterate over all the names that this node may be listed under.
+    def __init__(self, aka=None):
+        r'''
+        @param aka: other names
         '''
-        return self.sort_keys()
+        super(NamedNode, self).__init__()
+        aka = list(uniq(aka)) if aka else []
+        for a in aka:
+            assert isinstance(a, (basestring, multilang))
+        self.aka = aka
+
+    def names(self):
+        r'''Iterate over all the aka names that this organisation has.
+        '''
+        return iter(self.aka)
+
+    @uniq_generator
+    @expand_multilang_generator
+    def sort_keys(self):
+        r'''The sort keys under which this node may be listed are all the names
+        that this node has.  If any name is a multilang, then this expands it
+        into all its languages.
+        '''
+        return self.names()
 
     def matches(self, text):
         r'''Return true if any of the names of this node match the given text.

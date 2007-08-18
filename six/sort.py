@@ -60,7 +60,7 @@ class Sorter(object):
             self._sorted = None
             self._items = set()
             for node in self:
-                items = [SortItem(node, key) for key in uniq(node.sort_keys())]
+                items = [SortItem(node, key) for key in node.sort_keys()]
                 assert items
                 for item in items:
                     item.single = items[0]

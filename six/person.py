@@ -7,6 +7,8 @@ import time
 from six.input import InputError
 from six.node import *
 from six.sort import *
+from six.uniq import uniq_generator
+from six.multilang import *
 from six.personname import (PersonName, EnglishSpanishName, SingleName,
                             DecoratedName)
 from six.date import Datetime
@@ -25,9 +27,9 @@ class Person(NamedNode):
      - A person may have one or more email addresses.
     '''
 
-    def __init__(self, name):
+    def __init__(self, name, aka=None):
         assert isinstance(name, PersonName)
-        super(Person, self).__init__()
+        super(Person, self).__init__(aka=aka)
         self.name = name
 
     def only_place(self):
@@ -58,6 +60,8 @@ class Person(NamedNode):
     def matches(self, text):
         return self.name.matches(text)
 
+    @uniq_generator
+    @expand_multilang_generator
     def sort_keys(self):
         r'''Iterate over all the sort keys that this person can have.
         '''
@@ -76,7 +80,10 @@ class Person(NamedNode):
             yield self.name.collation_name()
         except ValueError:
             pass
+        for aka in self.aka:
+            yield aka
 
+    @uniq_generator
     def names(self):
         r'''Iterate over all the names that this person may be listed under.
         The first one is the person's complete name.  If the person has a
@@ -101,6 +108,8 @@ class Person(NamedNode):
                         yield self.name.full_name()
                     except ValueError:
                         pass
+        for aka in self.aka:
+            yield aka
 
     def familiar_name(self):
         r'''Return the person's name as used in a familiar context.
@@ -180,7 +189,7 @@ class Person(NamedNode):
         return kw
 
     @classmethod
-    def from_initargs(class_, kw):
+    def from_initargs(class_, kw, **kwargs):
         assert len(kw) != 0
         try:
             nkw = {}
@@ -198,7 +207,7 @@ class Person(NamedNode):
                 name = EnglishSpanishName(**nkw) 
             if dkw:
                 name = DecoratedName(name, **dkw)
-            return class_(name)
+            return class_(name, **kwargs)
         except ValueError, e:
             raise InputError(e, lines=kw.values())
 
