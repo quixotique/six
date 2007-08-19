@@ -110,7 +110,7 @@ class itext(unicode):
             >>> b[4]
             itext(u'd')
         '''
-        if not isinstance(text, unicode):
+        if not isinstance(text, basestring):
             return NotImplemented
         r = type(self)(unicode(self) + unicode(text))
         r.__loc = list(self.__loc)
@@ -130,7 +130,7 @@ class itext(unicode):
             >>> b[3]
             itext.new(u'd', loc=2)
         '''
-        if not isinstance(text, unicode):
+        if not isinstance(text, basestring):
             return NotImplemented
         r = type(self)(unicode(text) + unicode(self))
         r.__loc = []
