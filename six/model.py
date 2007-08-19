@@ -392,7 +392,8 @@ class ModelParser(object):
             if org:
                 self.parse_residences(common, org)
             else:
-                fam = Family()
+                aka = map(multilang.optparse, common.mgetvalue('aka', []))
+                fam = Family(aka=aka)
                 self.parse_residences(common, fam)
             for member in members:
                 member.dept = None

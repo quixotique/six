@@ -6,7 +6,8 @@ r'''Data model - Family.
 from collections import defaultdict
 from six.node import *
 from six.person import Person
-from six.sort import *
+from six.uniq import uniq_generator
+from six.multilang import *
 
 __all__ = ['Family']
 
@@ -91,6 +92,8 @@ class Family(NamedNode):
                                       ~test_link_attr('is_head'))):
             yield link.person
 
+    @uniq_generator
+    @expand_multilang_generator
     def sort_keys(self):
         r'''Iterate over all the sort keys that this family can have.  This
         starts with the full name of the family formed from the names of all
@@ -109,7 +112,10 @@ class Family(NamedNode):
                 pass
         for fn, gns in coll.iteritems():
             yield fn + ', ' + ' & '.join(gns)
+        for aka in self.aka:
+            yield aka
 
+    @uniq_generator
     def names(self):
         r'''Iterate over all the names that this family may be listed under.
         This only returns the principle name of the family, formed from the
@@ -118,18 +124,27 @@ class Family(NamedNode):
         swapped, which is of no use to anyone.
         '''
         yield self._name()
+        for aka in self.aka:
+            yield aka
 
     def matches(self, text):
         r'''Return true if the name of this family matches the given text.
         '''
         heads = list(self.heads())
         parts = filter(bool, [p.strip() for p in text.split('&')])
-        if len(parts) != len(heads):
-            return False
-        for h, p in zip(heads, parts):
-            if not h.matches(p):
-                return False
-        return True
+        if len(parts) == len(heads):
+            for h, p in zip(heads, parts):
+                if not h.matches(p):
+                    break
+            else:
+                return True
+        for name in self.aka:
+            if hasattr(name, 'matches') and callable(name.matches):
+                if name.matches(text):
+                    return True
+            elif name.startswith(text):
+                return True
+        return False
 
     def __repr__(self):
         return '%s()' % self.__class__.__name__
