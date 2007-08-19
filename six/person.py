@@ -66,16 +66,10 @@ class Person(NamedNode):
         r'''Iterate over all the sort keys that this person can have.
         '''
         try:
-            yield self.name.casual_name()
-        except ValueError:
-            try:
-                yield self.name.familiar_name()
-            except ValueError:
-                pass
-        try:
-            yield self.name.full_name()
+            yield self.name.informal_index_name()
         except ValueError:
             pass
+        yield self.name.formal_index_name()
         try:
             yield self.name.collation_name()
         except ValueError:
@@ -85,29 +79,17 @@ class Person(NamedNode):
 
     @uniq_generator
     def names(self):
-        r'''Iterate over all the names that this person may be listed under.
-        The first one is the person's complete name.  If the person has a
-        formal name, then that follows.  Otherwise, use the person's casual
-        name.  If that is not known, then try their familiar name.  If that is
-        not known either, then try their full name.
+        r'''Iterate over all the names that this person has.  First comes the
+        person's complete name, which contains all known words in the name, in
+        uncontracted form, or initials where only initials are known.  Then,
+        follows the person's familiar name if it differs from the first words
+        in the complete name.  Finally, all the aka names.
         '''
         try:
-            yield self.name.complete_name()
+            yield self.name.informal_index_name()
         except ValueError:
             pass
-        try:
-            yield self.name.formal_name()
-        except ValueError:
-            try:
-                yield self.name.casual_name()
-            except ValueError:
-                try:
-                    yield self.name.familiar_name()
-                except ValueError:
-                    try:
-                        yield self.name.full_name()
-                    except ValueError:
-                        pass
+        yield self.name.complete_name()
         for aka in self.aka:
             yield aka
 
