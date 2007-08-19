@@ -92,7 +92,7 @@ class SortItem(object):
         self.key = key
         # The key could be a multilang, so we must ensure it is a string for
         # collation purposes.
-        self.sortkey = text_sort_key(unicode(key))
+        self.sortkey = text_sort_key(key)
         self.single = single if single is not None else self
 
     def __cmp__(self, other):
