@@ -24,6 +24,7 @@ from six.input import InputError
 from six.model import *
 from six.links import *
 from six.sort import *
+from itertools import chain
 
 def main():
     locale.setlocale(locale.LC_ALL, '')
@@ -186,28 +187,44 @@ def report_dump(options, model, predicate, local, encoding):
         predicate = from_node(Person) | from_node(Company) | from_node(Family)
     # Populate the top level of the report with all the nodes that satisfy the
     # predicate.
-    sorter = Sorter()
-    sorter.update(model.nodes(predicate))
+    itemiser = Itemiser()
+    itemiser.update(model.nodes(predicate))
     # Add nodes that are implied by the predicate:
-    # - A selected department imples its parent company (and intermediate
+    # - A selected department imples its parent company (but not intermediate
     #   departments).
     # - A selected family implies all its members, and an organisation
     #   (company or department) implies all the people who work for it.
-    for node in list(sorter):
-        sorter.update((tup[-1] for tup in node.find_nodes(
-                            incoming & is_link(Has_department),
-                            select=lambda n: isinstance(n, Organisation))))
-    for node in list(sorter):
-        sorter.update(node.nodes(incoming &
+    for node in list(itemiser):
+        if isinstance(node, Department):
+            itemiser.update(n for n in node.all_parents()
+                                  if isinstance(n, Company))
+    for node in list(itemiser):
+        itemiser.update(node.nodes(incoming &
                                  (is_link(Belongs_to) | is_link(Works_at))))
+    # These sets control where entries are listed.
+    seen = set(itemiser)
+    see_in = defaultdict(set)
+    alias = dict()
+    # Departments, whether selected or not, are always listed within the entry
+    # of the company to which they belong.  So any other entries to such
+    # departments must be in the form of a reference to the company.  So we
+    # mark them as "seen" except for the company in which they musut appear.
+    # Departments that are included in the top-level listing must be replaced
+    # by an alias to the company in which they will be listed.
+    for node in list(itemiser):
+        if isinstance(node, Organisation):
+            depts = list(node.nodes(outgoing & is_link(Has_department)))
+            for dept in depts:
+                if dept in seen:
+                    itemiser.discard(dept)
+                    alias[dept] = node
+            seen.update(depts)
+            see_in[node].update(depts)
     # Remove top-level entries for certain people.
-    seen = set(sorter)
-    see_in_family = defaultdict(set)
-    see_in_org = defaultdict(set)
     for node in seen:
         if isinstance(node, Person):
             person = node
-            # People who are heads of organisations always get their own entry.
+            # People who are heads of organisations keep their own entry.
             works_at = list(person.links(outgoing & is_link(Works_at)))
             if [wat for wat in works_at if wat.is_head]:
                 continue
@@ -216,49 +233,54 @@ def report_dump(options, model, predicate, local, encoding):
             # own top-level entry.  Instead, their details will get listed
             # within that entry.
             families = list(person.nodes(outgoing & is_link(Belongs_to)))
-            if len(families) == 1 and families[0] in sorter:
-                sorter.discard(person)
-                see_in_family[families[0]].add(person)
-            elif len(works_at) == 1 and works_at[0].org in sorter:
-                sorter.discard(person)
-                see_in_org[works_at[0].org].add(person)
+            if len(families) == 1 and families[0] in itemiser:
+                itemiser.discard(person)
+                see_in[families[0]].add(person)
+            elif len(works_at) == 1:
+                orgs = [org for org in chain([works_at[0].org],
+                                             works_at[0].org.all_parents())
+                                    if org in itemiser]
+                itemiser.discard(person)
+                for org in orgs:
+                    see_in[org].add(person)
     # Form the sorted index of all the top-level entries in the report.
-    sorted = list(sorter.sorted())
+    toplevel = sorted(chain(itemiser.items(),
+                            itemiser.alias_items(alias.iteritems())))
     # Remove top-level entries that reference a nearby entry.  The horizon is a
     # heuristic for how far we expect a user will search around for an entry
     # which is out of order.
     horizon = 8
-    for i, item in enumerate(sorted):
+    for i, item in enumerate(toplevel):
         if item is item.single:
             lim = 0
             for j in xrange(i - 1, -1, -1):
-                if sorted[j].sortkey[:3] != item.sortkey[:3]:
+                if toplevel[j].sortkey[:3] != item.sortkey[:3]:
                     break
-                if sorted[j].node:
+                if toplevel[j].node:
                     lim += 1
                     if lim > horizon:
                         break
-                    if sorted[j].node is item.node:
-                        sorted[j].node = None
+                    if toplevel[j].node is item.node:
+                        toplevel[j].node = None
     # Remove top-level entries that reference the same entry as another nearby,
     # prior entry.
-    for i, item in enumerate(sorted):
+    for i, item in enumerate(toplevel):
         if item is not item.single:
             lim = 0
             for j in xrange(i - 1, -1, -1):
-                if sorted[j].sortkey[:3] != item.sortkey[:3]:
+                if toplevel[j].sortkey[:3] != item.sortkey[:3]:
                     break
-                if sorted[j].node:
+                if toplevel[j].node:
                     lim += 1
                     if lim > horizon:
                         break
-                    if sorted[j].node is item.node:
+                    if toplevel[j].node is item.node:
                         item.node = None
                         break
     # Now format the report.
     from six.output import Treebuf
     tree = Treebuf(local=local)
-    for item in sorted:
+    for item in toplevel:
         if item.node is None:
             pass
         elif item is not item.single:
@@ -269,36 +291,37 @@ def report_dump(options, model, predicate, local, encoding):
         elif isinstance(item.node, Person):
             tree.nl()
             dump_name(item.node, tree, name=item.key)
-            dump_person(item.node, tree.sub(), seen)
+            dump_person(item.node, tree.sub(),
+                        seen - see_in.get(item.node, set()))
         elif isinstance(item.node, Family):
             tree.nl()
             dump_name(item.node, tree, name=item.key)
             dump_family(item.node, tree.sub(),
-                        seen - see_in_family.get(item.node, set()))
+                        seen - see_in.get(item.node, set()))
         elif isinstance(item.node, Department):
             tree.nl()
             dump_name(item.node, tree, name=item.key)
             dump_organisation(item.node, tree.sub(),
-                              seen - see_in_org.get(item.node, set()))
+                              seen - see_in.get(item.node, set()))
         elif isinstance(item.node, Organisation):
             tree.nl()
             dump_name(item.node, tree, name=item.key)
             dump_organisation(item.node, tree.sub(),
-                              seen - see_in_org.get(item.node, set()))
+                              seen - see_in.get(item.node, set()))
     print unicode(tree).encode(encoding, 'replace')
 
 def report_email(options, model, predicate, local, encoding):
     if predicate is None:
         predicate = from_node(Person) | from_node(Company) | from_node(Family)
         options.all = False
-    sorter = Sorter()
-    sorter.update(model.nodes(predicate))
+    itemiser = Itemiser()
+    itemiser.update(model.nodes(predicate))
     # Remove entries for families for which one or more of the heads was found.
-    for person in filter(lambda node: isinstance(node, Person), sorter):
+    for person in filter(lambda node: isinstance(node, Person), itemiser):
         for belongs_to in person.links(outgoing & is_link(Belongs_to)):
             if belongs_to.is_head:
-                sorter.discard(belongs_to.family)
-    for item in sorter.sorted():
+                itemiser.discard(belongs_to.family)
+    for item in sorted(itemiser.items()):
         if item is not item.single:
             continue
         node = item.node
@@ -347,17 +370,17 @@ def report_phone(options, model, predicate, local, encoding):
     if predicate is None:
         predicate = ((from_node(Person) | from_node(Company)) & is_principal)
     tkw = {'fax': False, 'bold': True}
-    sorter = Sorter()
-    sorter.update(model.nodes(predicate))
+    itemiser = Itemiser()
+    itemiser.update(model.nodes(predicate))
     # Remove entries for families for which one or more of the heads was found.
-    people = filter(lambda node: isinstance(node, Person), sorter)
+    people = filter(lambda node: isinstance(node, Person), itemiser)
     for person in people:
         for belongs_to in person.links(outgoing & is_link(Belongs_to)):
             if belongs_to.is_head:
-                sorter.discard(belongs_to.family)
+                itemiser.discard(belongs_to.family)
     from six.output import Treebuf
     tree = Treebuf(local=local)
-    for item in sorter.sorted():
+    for item in sorted(itemiser.items()):
         if item is not item.single:
             continue
         node = item.node
@@ -532,7 +555,7 @@ def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
     dump_email(per, tree)
     dump_residences(per, tree)
     # Avoid endless recursion in dump_family() and dump_organisation().
-    seen |= set([per])
+    seen = seen | set([per])
     if show_family:
         for link in per.links(outgoing & is_link(Belongs_to)):
             refonly = link.family in seen
@@ -572,7 +595,7 @@ def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
 
 def dump_family(fam, tree, seen=frozenset(), show_members=True, show_data=True):
     # Avoid endless recursion in dump_person().
-    seen |= set([fam])
+    seen = seen | set([fam])
     dump_comments(fam, tree)
     dump_residences(fam, tree)
     telephones(fam, tree)
@@ -601,19 +624,19 @@ def dump_family(fam, tree, seen=frozenset(), show_members=True, show_data=True):
                 dump_person(link.person, sub, seen, show_family=False,
                             show_data=show_data)
 
-def dump_organisation(com, tree, seen=frozenset(), show_workers=True,
+def dump_organisation(org, tree, seen=frozenset(), show_workers=True,
                       show_data=True):
     # Avoid endless recursion in dump_works_at() and dump_organisation().
-    seen |= set([com])
-    dump_comments(com, tree)
-    telephones(com, tree)
-    dump_email(com, tree)
-    dump_residences(com, tree)
+    seen = seen | set([org])
+    dump_comments(org, tree)
+    telephones(org, tree)
+    dump_email(org, tree)
+    dump_residences(org, tree)
     if show_workers:
-        dump_works_at(com, tree, seen)
+        dump_works_at(org, tree, seen)
     if show_data:
-        dump_data(com, tree)
-    for link in com.links(outgoing & is_link(Has_department)):
+        dump_data(org, tree)
+    for link in org.links(outgoing & is_link(Has_department)):
         refonly = link.dept in seen
         if refonly:
             tree.add('-> ')

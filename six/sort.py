@@ -3,40 +3,36 @@
 r'''Data model - sorting.
 '''
 
-from itertools import imap, ifilter, chain
 from six.node import *
 from six.text import *
 from six.uniq import uniq
 
-__all__ = ['SortItem', 'Sorter']
+__all__ = ['SortItem', 'Itemiser']
 
-class Sorter(object):
-    r'''A Sorter is a set-like object to which nodes may be added, and
-    retrieved in sorted order.
+class Itemiser(object):
+    r'''An Itemiser is a set-like object to which nodes may be added, and
+    SortItem objects retrieved, based on the nodes added to date.
     '''
 
     def __init__(self):
         self._nodes = set()
         self._items = None
-        self._sorted = None
 
     def update(self, nodes):
-        r'''Append the given Nodes to the sorter.
+        r'''Append the given Nodes to the itemiser.
         '''
         for node in nodes:
             assert isinstance(node, Node)
             if node not in self._nodes:
                 self._nodes.add(node)
                 self._items = None
-                self._sorted = None
 
     def discard(self, node):
-        r'''Remove the given Node from the sorter.
+        r'''Remove the given Node from the itemiser.
         '''
         if node in self._nodes:
             self._nodes.remove(node)
             self._items = None
-            self._sorted = None
 
     def __iter__(self):
         r'''Iterate over all the Nodes added to date, in arbitrary order.
@@ -44,36 +40,46 @@ class Sorter(object):
         return iter(self._nodes)
 
     def __contains__(self, node):
-        r'''Return true if the given Node has been added to the sorter and not
-        discarded since.
+        r'''Return true if the given Node has been added to the itemiser and
+        not discarded since.
         '''
         return node in self._nodes
 
-    def items(self):
-        r'''Iterate over SortItem objects for all Nodes in the sorter, in
-        arbitrary order.  There will be at least one SortItem for each Node.
-        The 'single' attribute of each SortItem will always refer to the
-        principal SortItem for that Node, which corresponds to the first key
-        returned by the Node's sort_keys() method.
+    def items(self, node=None):
+        r'''Iterate over SortItem objects, in arbitrary order, for all the
+        given node, or for all nodes in the itemiser if the 'node' argument is
+        None.  There will be at least one SortItem for each Node.  The 'single'
+        attribute of each SortItem will always refer to the first SortItem for
+        that Node, which corresponds to the first key returned by the Node's
+        sort_keys() method.
         '''
         if self._items is None:
-            self._sorted = None
-            self._items = set()
-            for node in self:
-                items = [SortItem(node, key) for key in node.sort_keys()]
+            self._items = dict()
+            for node1 in self:
+                items = [SortItem(node1, key) for key in node1.sort_keys()]
                 assert items
                 for item in items:
                     item.single = items[0]
-                    self._items.add(item)
-        return iter(self._items)
+                self._items[node1] = items
+        if node is None:
+            for items in self._items.itervalues():
+                for item in items:
+                    yield item
+        else:
+            for item in self._items[node]:
+                yield item
 
-    def sorted(self):
-        r'''Iterate over SortItems, in sorted order.
+    def alias_items(self, aliases=()):
+        r'''Iterate over SortItem objects generated from the given sequence
+        of (src, dst) node pairs.  Each 'dst' node must be present in the
+        itemiser already.
         '''
-        if self._sorted is None:
-            self._sorted = list(self.items())
-            self._sorted.sort()
-        return iter(self._sorted)
+        for src, dst in aliases:
+            di = self.items(dst).next()
+            for key in src.sort_keys():
+                si = SortItem(dst, key)
+                si.single = di
+                yield si
 
 class SortItem(object):
     r'''When sorting nodes, one node may appear in several places in the
