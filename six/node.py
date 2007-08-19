@@ -528,7 +528,9 @@ class NamedNode(Node):
         self.aka = aka
 
     def names(self):
-        r'''Iterate over all the aka names that this organisation has.
+        r'''Iterate over all the aka names that this organisation has.  This
+        method will almost certainly be overridden by all subclasses of
+        NamedNode.
         '''
         return iter(self.aka)
 
