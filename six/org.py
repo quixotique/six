@@ -35,6 +35,26 @@ class Organisation(NamedNode):
         self.name = name
         self.prefer = prefer
 
+    @uniq_generator
+    def names(self):
+        r'''Iterate over all the names that this organisation can have.
+        '''
+        if self.prefer:
+            yield self.prefer
+        yield self.name
+        for name in self.aka:
+            yield name
+
+    def all_parents(self):
+        r'''Iterate through all the organisations that this organisation
+        belongs to, in breadth-wise bottom-up order (ie, each organisation of
+        which this is a department is followed immediately by its parents).
+        '''
+        for org in self.nodes(incoming & is_link(Has_department)):
+            yield org
+            for org1 in org.all_parents():
+                yield org1
+
     def only_place(self):
         r'''An organisation's place depends on its residence(s), or if none,
         then its postal address(es), or if none, then its phone number(s), or
@@ -56,16 +76,6 @@ class Organisation(NamedNode):
                                    (outgoing & is_link(Has_phone))):
             if tup[-1].place:
                 yield tup[-1].place
-
-    @uniq_generator
-    def names(self):
-        r'''Iterate over all the names that this organisation can have.
-        '''
-        if self.prefer:
-            yield self.prefer
-        yield self.name
-        for name in self.aka:
-            yield name
 
     def __repr__(self):
         r = ['name=%r' % self.name, 'aka=%r' % map(repr, self.aka)]
