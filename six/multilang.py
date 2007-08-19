@@ -135,14 +135,22 @@ class multilang(object):
         r'''Iterates over all the texts in all languages, starting with the
         given language, or if not specified, the language of the current
         locale, followed by all other languages in undefined order.
+
+            >>> t = multilang(en='Spain', es=u'España')
+            >>> list(t.itertexts('en'))
+            ['Spain', u'Espa\xf1a']
+            >>> list(t.itertexts('es'))
+            [u'Espa\xf1a', 'Spain']
+
         '''
+        if lang is None:
+            lang = locale.getlocale(locale.LC_MESSAGES)[0]
         first = None
-        if lang is not None:
-            try:
-                first = self.local(lang)
-                yield first
-            except KeyError:
-                pass
+        try:
+            first = self.local(lang)
+            yield first
+        except KeyError:
+            pass
         if hasattr(self, 'text'):
             if self.text != first:
                 yield self.text
