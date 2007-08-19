@@ -629,9 +629,15 @@ class ModelParser(object):
             self.parse_con(part, per, 'com', Comment, Has_comment)
             self.parse_data(part, per)
             self.parse_keywords(part, per)
-            # Parse any 'work', 'with', and 'ex' sub-parts.
+            # Parse any 'work', 'work-', 'with', and 'ex' sub-parts.  The
+            # 'work-' variant does not make the person a head of the
+            # organisation they work for.
             self.parse_assoc(part, per, 'work', (Organisation, Residence),
-                             Works_at, self.parse_assoc_contacts_work)
+                             Works_at, self.parse_assoc_contacts_work,
+                             is_head=True)
+            self.parse_assoc(part, per, 'work-', (Organisation, Residence),
+                             Works_at, self.parse_assoc_contacts_work,
+                             is_head=False)
             self.parse_assoc(part, per, 'with', NamedNode, With,
                              self.parse_assoc_contacts)
             self.parse_assoc(part, per, 'ex', NamedNode, Ex,
@@ -653,7 +659,9 @@ class ModelParser(object):
         and parse work contact details that pertain to the association link.
         This method is used when the works-at relationship is implicit (ie, not
         explicitly defined with a 'work' line), so the link does not have its
-        own sub-part to contain contact and other details.
+        own sub-part to contain contact and other details.  Whether or not the
+        person is a head of the organisation is derived from the part's
+        delimiter, in make_assoc().
         '''
         wat = self.make_assoc(part, who, org, Works_at)
         self.parse_contacts_work(part, wat)
@@ -667,7 +675,8 @@ class ModelParser(object):
         self.parse_con(part, who, 'faxw', Telephone, Has_fax_work)
         self.parse_con(part, who, 'emw', Email, Has_email_work)
 
-    def parse_assoc(self, part, who, key, ntype, ltype, parse_sub=None):
+    def parse_assoc(self, part, who, key, ntype, ltype, parse_sub=None,
+                          is_head=None):
         r'''Parse an association line, look up the referred node, and link it
         to a given node with an Association link or subclass thereof.  Parse
         any contact details, data, and comments that pertain to the
@@ -684,14 +693,15 @@ class ModelParser(object):
                     sub.place = part.place
                     sub.defaults = part.defaults
                 ass = self.make_assoc(sub, who, oth, ltype,
-                                      timestamp=(sub or part).updated)
+                                      timestamp=(sub or part).updated,
+                                      is_head=is_head)
                 if sub:
                     if parse_sub:
                         parse_sub(sub, ass)
                     self.parse_data(sub, ass)
                     self.parse_con(sub, ass, 'com', Comment, Has_comment)
 
-    def make_assoc(self, part, who, oth, ltype, timestamp=None):
+    def make_assoc(self, part, who, oth, ltype, timestamp=None, is_head=None):
         r'''Create an Associate_with link (or subtype) between two nodes,
         with suitable constructor data.
         '''
@@ -699,10 +709,13 @@ class ModelParser(object):
         # Here we introspect the keyword args accepted by ltype's constructor
         # and adapt accordingly.
         kw = {'timestamp': timestamp}
+        if is_head is not None:
+            kw['is_head'] = is_head
         if part:
             import inspect
             kwa = dict.fromkeys(inspect.getargspec(ltype.__init__)[0])
-            if 'is_head' in kwa and hasattr(part, 'delim'):
+            if ('is_head' in kwa and hasattr(part, 'delim') and
+                'is_head' not in kw):
                 kw['is_head'] = part.delim != '-'
             if 'sequence' in kwa and hasattr(part, 'sequence'):
                 kw['sequence'] = part.sequence
