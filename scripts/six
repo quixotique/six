@@ -24,7 +24,6 @@ from six.input import InputError
 from six.model import *
 from six.links import *
 from six.sort import *
-from itertools import ifilter
 
 def main():
     locale.setlocale(locale.LC_ALL, '')
@@ -265,24 +264,25 @@ def report_dump(options, model, predicate, local, encoding):
         elif item is not item.single:
             tree.nl()
             tree.add(item.key, ' -> ')
-            dump_name(item.single.node, tree, show_aka=False)
+            dump_name(item.single.node, tree, name=item.single.key,
+                      show_aka=False)
         elif isinstance(item.node, Person):
             tree.nl()
-            dump_name(item.node, tree)
+            dump_name(item.node, tree, name=item.key)
             dump_person(item.node, tree.sub(), seen)
         elif isinstance(item.node, Family):
             tree.nl()
-            dump_name(item.node, tree)
+            dump_name(item.node, tree, name=item.key)
             dump_family(item.node, tree.sub(),
                         seen - see_in_family.get(item.node, set()))
         elif isinstance(item.node, Department):
             tree.nl()
-            dump_name(item.node, tree)
+            dump_name(item.node, tree, name=item.key)
             dump_organisation(item.node, tree.sub(),
                               seen - see_in_org.get(item.node, set()))
         elif isinstance(item.node, Organisation):
             tree.nl()
-            dump_name(item.node, tree)
+            dump_name(item.node, tree, name=item.key)
             dump_organisation(item.node, tree.sub(),
                               seen - see_in_org.get(item.node, set()))
     print unicode(tree).encode(encoding, 'replace')
@@ -485,7 +485,8 @@ def add_name(node, tree, context=None):
         if isinstance(node, Person) and isinstance(context, Belongs_to):
             assert context.person is node
             hn = node.family_head_name()
-            names = [n for n in names if n != hn] or names
+            names = [n for n in names
+                       if hn != n and not hn.startswith(n + ' ')] or names
     else:
         names = [node]
     tree.add(names[0])
@@ -501,14 +502,23 @@ def add_name(node, tree, context=None):
             tree.add(', ', context.position)
     return names[1:]
 
-def dump_name(node, tree, context=None, show_aka=True):
-    aka_names = add_name(node, tree, context)
+def dump_name(node, tree, context=None, name=None, show_aka=True):
+    if name:
+        tree.add(name)
+        aka_names = None
+        if show_aka:
+            aka_names = map(unicode, node.names())
+    else:
+        aka_names = add_name(node, tree, context)
+        if not show_aka:
+            aka_names = None
     tree.nl()
-    if aka_names and show_aka:
+    if aka_names:
         tree = tree.sub()
-        for name in aka_names:
-            tree.add('= ', name)
-            tree.nl()
+        for aka in aka_names:
+            if aka != name:
+                tree.add('= ', aka)
+                tree.nl()
 
 def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
                 show_data=True):
