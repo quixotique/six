@@ -190,14 +190,17 @@ def report_dump(options, model, predicate, local, encoding):
     itemiser = Itemiser()
     itemiser.update(model.nodes(predicate))
     # Add nodes that are implied by the predicate:
+    # - A selected person implies the family they belong to.
+    for node in list(itemiser):
+        itemiser.update(node.nodes(outgoing & is_link(Belongs_to)))
     # - A selected department imples its parent company (but not intermediate
     #   departments).
-    # - A selected family implies all its members, and an organisation
-    #   (company or department) implies all the people who work for it.
     for node in list(itemiser):
         if isinstance(node, Department):
             itemiser.update(n for n in node.all_parents()
                                   if isinstance(n, Company))
+    # - A family implies all its members, and an organisation (company or
+    #   department) implies all the people who work for it.
     for node in list(itemiser):
         itemiser.update(node.nodes(incoming &
                                  (is_link(Belongs_to) | is_link(Works_at))))
