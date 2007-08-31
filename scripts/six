@@ -288,27 +288,26 @@ def report_dump(options, model, predicate, local, encoding):
             pass
         elif item is not item.single:
             tree.nl()
-            tree.add(item.key, ' -> ')
-            dump_name(item.single.node, tree, name=item.single.key,
-                      show_aka=False)
+            tree.add(item.key, ' -> ', item.single.key)
+            tree.nl()
         elif isinstance(item.node, Person):
             tree.nl()
-            dump_name(item.node, tree, name=item.key)
+            dump_names(item.node, tree, name=item.key)
             dump_person(item.node, tree.sub(),
                         seen - see_in.get(item.node, set()))
         elif isinstance(item.node, Family):
             tree.nl()
-            dump_name(item.node, tree, name=item.key)
+            dump_names(item.node, tree, name=item.key)
             dump_family(item.node, tree.sub(),
                         seen - see_in.get(item.node, set()))
         elif isinstance(item.node, Department):
             tree.nl()
-            dump_name(item.node, tree, name=item.key)
+            dump_names(item.node, tree, name=item.key)
             dump_organisation(item.node, tree.sub(),
                               seen - see_in.get(item.node, set()))
         elif isinstance(item.node, Organisation):
             tree.nl()
-            dump_name(item.node, tree, name=item.key)
+            dump_names(item.node, tree, name=item.key)
             dump_organisation(item.node, tree.sub(),
                               seen - see_in.get(item.node, set()))
     print unicode(tree).encode(encoding, 'replace')
@@ -505,7 +504,7 @@ def add_name(node, tree, context=None):
     if context is not None:
         assert isinstance(context, Link)
     if isinstance(node, NamedNode):
-        names = list(node.names())
+        names = list(node.names(with_aka=False))
         # When listing a person within their family's entry, omit the name as
         # it would appear in the family entry's head.
         if isinstance(node, Person) and isinstance(context, Belongs_to):
@@ -528,16 +527,12 @@ def add_name(node, tree, context=None):
             tree.add(', ', context.position)
     return names[1:]
 
-def dump_name(node, tree, context=None, name=None, show_aka=True):
+def dump_names(node, tree, context=None, name=None):
     if name:
         tree.add(name)
-        aka_names = None
-        if show_aka:
-            aka_names = map(unicode, node.names())
+        aka_names = map(unicode, node.names())
     else:
         aka_names = add_name(node, tree, context)
-        if not show_aka:
-            aka_names = None
     tree.nl()
     if aka_names:
         tree = tree.sub()
@@ -612,14 +607,15 @@ def dump_family(fam, tree, seen=frozenset(), show_members=True, show_data=True):
                                           l.person.sortkey())):
             if link.person in seen:
                 tree.add('-> ')
-                dump_name(link.person, tree, link, show_aka=False)
+                tree.add(link.person.sort_keys().next())
+                tree.nl()
                 sub = tree.sub()
                 dump_comments(link, sub)
                 telephones(link, sub)
                 dump_email(link, sub)
             else:
                 tree.add('-- ')
-                dump_name(link.person, tree, link)
+                dump_names(link.person, tree, link)
                 sub = tree.sub()
                 dump_comments(link, sub)
                 telephones(link, sub)
@@ -643,7 +639,10 @@ def dump_organisation(org, tree, seen=frozenset(), show_workers=True,
         refonly = link.dept in seen
         if refonly:
             tree.add('-> ')
-        dump_name(link.dept, tree, link, show_aka=not refonly)
+            tree.add(link.dept.sort_keys().next())
+            tree.nl()
+        else:
+            dump_names(link.dept, tree, link)
         sub = tree.sub()
         dump_comments(link, sub)
         if not refonly:
@@ -659,9 +658,11 @@ def dump_works_at(org, tree, seen):
         refonly = link.person in seen
         if refonly:
             tree.add('-> ')
+            tree.add(link.person.sort_keys().next())
+            tree.nl()
         else:
             tree.add('-- ')
-        dump_name(link.person, tree, link, show_aka=not refonly)
+            dump_names(link.person, tree, link)
         sub = tree.sub()
         dump_comments(link, sub)
         telephones(link, sub)

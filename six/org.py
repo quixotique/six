@@ -36,14 +36,15 @@ class Organisation(NamedNode):
         self.prefer = prefer
 
     @uniq_generator
-    def names(self):
+    def names(self, with_aka=True):
         r'''Iterate over all the names that this organisation can have.
         '''
         if self.prefer:
             yield self.prefer
         yield self.name
-        for name in self.aka:
-            yield name
+        if with_aka:
+            for name in self.aka:
+                yield name
 
     def all_parents(self):
         r'''Iterate through all the organisations that this organisation

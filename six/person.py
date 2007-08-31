@@ -78,20 +78,22 @@ class Person(NamedNode):
             yield aka
 
     @uniq_generator
-    def names(self):
+    def names(self, with_aka=True):
         r'''Iterate over all the names that this person has.  First comes the
-        person's complete name, which contains all known words in the name, in
-        uncontracted form, or initials where only initials are known.  Then,
-        follows the person's familiar name if it differs from the first words
-        in the complete name.  Finally, all the aka names.
+        person's informal name if it can be formed, followed by the complete
+        name which contains all known words in the name, in uncontracted form,
+        or initials where only initials are known.  Then, follows the person's
+        familiar name if it differs from the first words in the complete name.
+        Finally, all the aka names.
         '''
         try:
             yield self.name.informal_index_name()
         except ValueError:
             pass
         yield self.name.complete_name()
-        for aka in self.aka:
-            yield aka
+        if with_aka:
+            for aka in self.aka:
+                yield aka
 
     def familiar_name(self):
         r'''Return the person's name as used in a familiar context.

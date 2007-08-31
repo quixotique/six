@@ -527,12 +527,13 @@ class NamedNode(Node):
             assert isinstance(a, (basestring, multilang))
         self.aka = aka
 
-    def names(self):
+    def names(self, with_aka=True):
         r'''Iterate over all the aka names that this organisation has.  This
         method will almost certainly be overridden by all subclasses of
         NamedNode.
         '''
-        return iter(self.aka)
+        if with_aka:
+            return iter(self.aka)
 
     @uniq_generator
     @expand_multilang_generator

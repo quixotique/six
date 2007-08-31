@@ -116,7 +116,7 @@ class Family(NamedNode):
             yield aka
 
     @uniq_generator
-    def names(self):
+    def names(self, with_aka=True):
         r'''Iterate over all the names that this family may be listed under.
         This only returns the principle name of the family, formed from the
         names of the heads in proper order.  This avoids listings that show
@@ -124,8 +124,9 @@ class Family(NamedNode):
         swapped, which is of no use to anyone.
         '''
         yield self._name()
-        for aka in self.aka:
-            yield aka
+        if with_aka:
+            for aka in self.aka:
+                yield aka
 
     def matches(self, text):
         r'''Return true if the name of this family matches the given text.
