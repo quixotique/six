@@ -144,7 +144,37 @@ class World(object):
         except LookupError, e:
             raise InputError(e, char=text)
 
-class Country(Node):
+class _Matcher(object):
+
+    r'''A mixin class that supports case-insensitive matching for objects
+    that have many names that can be a mixture of string and multilang.
+    '''
+
+    def all_names(self):
+        r'''Iterate over all the names (basestring or multilang) that this
+        country has.
+        '''
+        assert False, 'must override in subclass'
+
+    def all_names_upper(self):
+        r'''Iterate over all the names (basestring or multilang) that this
+        country has, converted to uppercase.  Helpful for performing
+        case-insensitive comparisons.
+        '''
+        return (name.upper() for name in self.all_names())
+
+    def matches(self, name):
+        name = name.upper()
+        for n in self.all_names_upper():
+            if hasattr(n, 'matches') and callable(n.matches):
+                if n.matches(name):
+                    return True
+            else:
+                if n == name:
+                    return True
+        return False
+
+class Country(Node, _Matcher):
 
     r'''
         >>> c = Country('AU', 'en', '61', multilang(en='Australia'), \
@@ -155,13 +185,17 @@ class Country(Node):
         Country('AU', 'en_AU', '61', multilang(en='Australia'), aprefix='0', sprefix='1')
         >>> unicode(c)
         u'Australia'
+        >>> c.matches('AU')
+        True
         >>> c.matches('au')
         True
-        >>> c.matches('aust')
+        >>> c.matches('Aust')
         False
+        >>> c.matches('Australia')
+        True
         >>> c.matches('australia')
         True
-        >>> c.matches('oz')
+        >>> c.matches('OZ')
         False
     '''
 
@@ -223,7 +257,7 @@ class Country(Node):
             r += ['sprefix=%r' % self.sprefix]
         if self.fullname != self.name:
             r += ['fullname=%r' % self.fullname]
-        areas = list(self.iterareas())
+        #areas = list(self.iterareas())
         #if areas:
         #    r += ['areas=%r' % areas]
         return '%s(%s)' % (self.__class__.__name__, ', '.join(r))
@@ -231,9 +265,24 @@ class Country(Node):
     def __cmp__(self, other):
         return cmp(self.iso3166_a2, other.iso3166_a2)
 
-    def matches(self, name):
-        return name.upper() == self.iso3166_a2 or \
-               self.name.matches(name) or self.fullname.matches(name)
+    def all_names(self):
+        r'''Iterate over all the names (basestring or multilang) that this
+        country has.
+        '''
+        yield self.iso3166_a2
+        yield self.name
+        if self.fullname:
+            yield self.fullname
+
+    def all_names_upper(self):
+        r'''Iterate over all the names (basestring or multilang) that this
+        country has, converted to uppercase.  Helpful for performing
+        case-insensitive comparisons.
+        '''
+        yield self.iso3166_a2
+        yield self.name.upper()
+        if self.fullname:
+            yield self.fullname.upper()
 
     def add(self, area):
         assert area.country is self
@@ -341,7 +390,7 @@ class Country(Node):
         return class_(iso3166_a2, language, ccode, name, fullname=fullname,
                       aprefix=aprefix, sprefix=sprefix)
 
-class Area(Node):
+class Area(Node, _Matcher):
 
     r'''
         >>> au = Country('AU', 'en', '61', multilang(en='Australia'))
@@ -350,16 +399,24 @@ class Area(Node):
         Area(Country('AU', 'en_AU', '61', multilang(en='Australia')), '8', multilang('SA'), fullname=multilang(en='South Australia', es='Australia Meridional'))
         >>> str(sa)
         'SA'
-        >>> sa.matches('au')
+        >>> sa.matches('AU')
         False
-        >>> sa.matches('aust')
+        >>> sa.matches('Aust')
+        False
+        >>> sa.matches('Australia')
         False
         >>> sa.matches('australia')
         False
+        >>> sa.matches('South Australia')
+        True
         >>> sa.matches('south australia')
+        True
+        >>> sa.matches('SA')
         True
         >>> sa.matches('sa')
         True
+        >>> sa.matches('South')
+        False
         >>> sa.matches('south')
         False
     '''
@@ -390,8 +447,13 @@ class Area(Node):
             r += ['fullname=%r' % self.fullname]
         return '%s(%s)' % (self.__class__.__name__, ', '.join(r))
 
-    def matches(self, name):
-        return self.name.matches(name) or self.fullname.matches(name)
+    def all_names(self):
+        r'''Iterate over all the names (basestring or multilang) that this
+        area has.
+        '''
+        yield self.name
+        if self.fullname:
+            yield self.fullname
 
     @classmethod
     def parse(class_, text, country):

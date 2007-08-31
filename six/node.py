@@ -553,7 +553,7 @@ class NamedNode(Node):
             if hasattr(name, 'matches') and callable(name.matches):
                 if name.matches(text):
                     return True
-            elif name.startswith(text):
+            elif name == text:
                 return True
         return False
 

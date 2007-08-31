@@ -47,8 +47,8 @@ class multilang(object):
 
     def __unicode__(self):
         r'''Return the localised form of the text that depends on the current
-        locale.  If there is no form in the current locale's language, then
-        return a form at random.
+        locale.  If there is no form in the current locale's language, or the
+        form is an empty string, then return a non-empty form at random.
 
             >>> t = multilang(en='Spain', es=u'España')
             >>> loc = locale.getlocale(locale.LC_MESSAGES)
@@ -92,15 +92,46 @@ class multilang(object):
         '''
         return self.__as(str)
 
+    def __nonzero__(self):
+        r'''Tests as true if contains any non-empty string.
+        '''
+        if hasattr(self, 'alt'):
+            for alt in self.alt.itervalues():
+                if alt:
+                    return True
+            return False
+        return bool(self.text)
+
+    def upper(self):
+        r'''Return a new multilang object with all texts in uppercase.
+
+            >>> t = multilang(en='Spain', es=u'España')
+            >>> t.upper()
+            multilang(en='SPAIN', es=u'ESPA\xd1A')
+
+        '''
+        u = type(self).__new__(type(self))
+        if hasattr(self, 'alt'):
+            u.alt = dict((lang, text.upper())
+                         for lang, text in self.alt.iteritems())
+        else:
+            u.text = self.text.upper()
+        return u
+
     def __as(self, strtype):
         if hasattr(self, 'alt'):
             lang = locale.getlocale(locale.LC_MESSAGES)[0]
             if lang is not None:
                 try:
-                    return strtype(self.local(lang))
+                    s = self.local(lang)
+                    if s:
+                        return strtype(s)
                 except KeyError:
                     pass
-            return strtype(self.alt.values()[0])
+            for s in self.alt.itervalues():
+                if s:
+                    return strtype(s)
+            return strtype()
         return strtype(self.text)
 
     def local(self, lang):
@@ -168,11 +199,10 @@ class multilang(object):
                           for k in sorted(self.alt.keys()))))
 
     def matches(self, text):
-        text = text_match_key(text)
         if hasattr(self, 'text'):
-            return text_match_key(self.text) == text
+            return self.text == text
         for v in self.alt.itervalues():
-            if text_match_key(v) == text:
+            if v == text:
                 return True
         return False
 
