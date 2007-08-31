@@ -176,10 +176,13 @@ class ModelParser(object):
             try:
                 hung = len(retry)
                 while retry:
-                    channel = retry.pop()
+                    channel, reason = retry.pop()
                     channel.close()
                     channel.send(None)
                 if len(self._suspended) == hung:
+                    # This debug can help resolve circular references.
+                    #for channel, reason in self._suspended:
+                    #    print reason
                     self._no_suspend = True
             finally:
                 self._suspended.update(retry)
@@ -189,14 +192,14 @@ class ModelParser(object):
         before calling sys.exit(), otherwise things could get ugly.
         '''
         while self._suspended:
-            self._suspended.pop().send_exception(TaskletExit)
+            self._suspended.pop()[0].send_exception(TaskletExit)
 
     def find(self, typ, text):
         r'''Call self.model.find() and if it fails to find any node, suspend
         the current tasklet and queue ourselves to be resumed later.
         '''
         while True:
-            self._suspend()
+            self._suspend('find(%r, %r)' % (typ, text))
             try:
                 return self.model.find(typ, text)
             except FindError, e:
@@ -208,13 +211,13 @@ class ModelParser(object):
                 if self._no_suspend:
                     raise 
 
-    def _suspend(self):
+    def _suspend(self, why=None):
         r'''Suspend the running tasklet until awoken.
         '''
         ch = stackless.channel()
-        self._suspended.add(ch)
+        self._suspended.add((ch, why))
         ch.receive()
-        assert ch not in self._suspended
+        assert ch not in (c for c, w in self._suspended)
         del ch
 
     def parse_default(self, text):
@@ -404,7 +407,21 @@ class ModelParser(object):
                                                   optional=bool(member.dept),
                                                   principal=member.delim != '-',
                                                   with_aka=not member.dept)
+                if not org:
+                    assert member.person
+                    assert not member.dept
+                    Belongs_to(member.person, fam,
+                               is_head=member.delim != '-',
+                               sequence=member.sequence,
+                               timestamp=member.updated or common.updated)
                 self.parse_residences(member, member.dept or member.person)
+            # We register a Family object only after all members have been
+            # linked with Belongs_to, because the result of Family.matches(),
+            # which is invoked through find(), depends on the members, and if
+            # we registered it earlier, then it could potentially match where
+            # it shouldn't.
+            if not org:
+                self.model.register(fam)
             # Now that all the named nodes are registered, we can parse contact
             # details (which might suspend in find()).
             if org:
@@ -423,20 +440,8 @@ class ModelParser(object):
                         assert member.dept
                         self.parse_org_extra(member, member.dept)
                 else:
-                    assert member.person
-                    assert not member.dept
-                    Belongs_to(member.person, fam,
-                               is_head=member.delim != '-',
-                               sequence=member.sequence,
-                               timestamp=member.updated or common.updated)
                     self.parse_contacts_work(member, member.person)
                 self.parse_person_con(member, member.person, member.dept)
-            # Register a Family object only after all members have been added,
-            # because the result of Family.matches(), which is invoked through
-            # find(), depends on the members, and if we registered it earlier,
-            # then it could potentially match where it shouldn't.
-            if not org:
-                self.model.register(fam)
         # Now find lines that were not parsed, and complain about them.
         missed = set()
         for part in chain([common], members):
