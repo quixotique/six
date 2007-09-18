@@ -57,12 +57,15 @@ class Organisation(NamedNode):
                 yield org1
 
     def only_place(self):
-        r'''An organisation's place depends on its residence(s), or if none,
-        then its postal address(es), or if none, then its phone number(s), or
-        if none, then if it is a department, its company's place.
+        r'''An organisation's place, if not explicitly set, is derived from its
+        residence(s), or if none, then its postal address(es), or if none, then
+        its phone number(s), or if none, then if it is a department, its
+        company's place.
         '''
         from six.links import Resides_at, Has_postal_address, Belongs_to
         from six.telephone import Has_phone
+        if self.place:
+            return self.place
         return self.derive_only_place(outgoing & is_link(Resides_at),
                                       outgoing & is_link(Has_postal_address),
                                       outgoing & is_link(Has_phone),
@@ -71,6 +74,8 @@ class Organisation(NamedNode):
     def _all_places(self):
         from six.links import Resides_at, Has_postal_address
         from six.telephone import Has_phone
+        if self.place:
+            yield self.place
         for tup in self.find_nodes((outgoing & is_link(Resides_at)) |
                                    (outgoing & is_link(Has_postal_address)) |
                                    (outgoing & is_link(Has_department)) |
@@ -112,6 +117,11 @@ class Has_department(Link):
         super(Has_department, self).__init__(company, dept, timestamp=timestamp)
         self.company = company
         self.dept = dept
+
+    def only_place(self):
+        r'''The place of a company is the default place of its departments.
+        '''
+        return self.company.only_place()
 
 from six.links import Association
 

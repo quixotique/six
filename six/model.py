@@ -481,6 +481,7 @@ class ModelParser(object):
         # The preferred name is the one that appears first in the input.
         prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
         org = self.model.register(Company(name=name, aka=aka, prefer=prefer))
+        org.place = part.place
         dept = self.parse_dept(part, org, optional=True, with_aka=False)
         return dept if dept else org
 
@@ -496,6 +497,7 @@ class ModelParser(object):
         prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
         dept = self.model.register(Department(name=name, aka=aka,
                                               prefer=prefer))
+        dept.place = part.place
         try:
             Has_department(org, dept)
         except ValueError, e:
@@ -757,10 +759,10 @@ class ModelParser(object):
         if key in part:
             for text in part.mgetvalue(key):
                 obj, comment = ntype.parse(text,
-                               place=part.place,
-                               world=self.world,
-                               default_place=who.only_place() or
-                                             part.defaults.place)
+                                           place=part.place,
+                                           world=self.world,
+                                           default_place=who.only_place() or
+                                                         part.defaults.place)
                 kw = {}
                 if comment:
                     kw['comment'] = comment
