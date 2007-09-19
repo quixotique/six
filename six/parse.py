@@ -446,15 +446,23 @@ class dataset_loc_memo(object):
         True
         >>> '1' in m
         False
+        >>> m.memo
+        set([])
         >>> m.get('a')
         Traceback (most recent call last):
         InputError: 3: duplicate 'a'
         >>> m.mget('a')
         [(itext.new(u'1', loc=1), None), (itext.new(u'3', loc=3), None)]
+        >>> m.memo == set([1, 3])
+        True
         >>> m.get('b')
         (itext.new(u'2', loc=2), None)
+        >>> m.memo == set([1, 2, 3])
+        True
         >>> m.mget('b')
         [(itext.new(u'2', loc=2), None)]
+        >>> m.memo == set([1, 2, 3])
+        True
         >>> m.get('d')
         Traceback (most recent call last):
         InputError: 10: missing 'd'
