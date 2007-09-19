@@ -102,7 +102,8 @@ class Data_factory_context(object):
             if not place:
                 raise InputError('data context (place) unknown',
                                  line=value)
-            context = context.link(outgoing & is_link(Is_in) & has_place(place))
-            if not context:
-                context = Is_in(context, place)
+            is_in = context.link(outgoing & is_link(Is_in) & has_place(place))
+            if not is_in:
+                is_in = Is_in(context, place)
+            context = is_in
         return Data(context, id, value, timestamp=part.updated)
