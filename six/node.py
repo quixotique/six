@@ -30,7 +30,7 @@ class Node(object):
 
     def add_link(self, r):
         r'''Used by Link().'''
-        assert isinstance(r, Link)
+        assert isinstance(r, Link), '%r is not a Link' % r
         if r not in self._links:
             self._links.add(r)
 
@@ -220,10 +220,11 @@ class Link(Node):
     '''
 
     def __init__(self, n1, n2, timestamp=None):
-        assert isinstance(n1, Node)
-        assert isinstance(n2, Node)
+        assert isinstance(n1, Node), 'n1=%r is not a Node' % n1
+        assert isinstance(n2, Node), 'n2=%r is not a Node' % n2
         if timestamp is not None:
-            assert isinstance(timestamp, datetime.date)
+            assert isinstance(timestamp, datetime.date), \
+                    'timestamp=%r is not a datetime.date' % timestamp
         super(Link, self).__init__()
         self.node1 = n1
         self.node2 = n2
