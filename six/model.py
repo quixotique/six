@@ -331,9 +331,9 @@ class ModelParser(object):
         # "common" part must define an organisation, or else it is taken to
         # define a family.
         if len(members) == 0:
-            # "common" could be a company, or person, or both, or if
-            # neither then it must define a residence.  Never a family.
-            org = self.parse_org(common, optional=True)
+            # "common" could be a company or department, or person, or both, or
+            # if neither then it must define a residence.  Never a family.
+            org = self.parse_company_or_dept(common, optional=True)
             per = self.parse_person(common, optional=True, with_aka=not org,
                                     principal=False if org else True)
             if org:
@@ -361,12 +361,14 @@ class ModelParser(object):
             if per:
                 self.parse_person_con(common, per, org)
         elif len(members) == 1:
-            # "Common" must be a company.  "Members[0]" must be a
-            # person and/or department.
-            org = self.parse_org(common, optional=False)
+            # "Common" must be a company or department.  "Members[0]" must be a
+            # person and/or department (if common is not a department).
+            org = self.parse_company_or_dept(common, optional=False)
             self.parse_residences(common, org)
-            dept = self.parse_dept(members[0], org, optional=True,
-                                   with_aka=True)
+            dept = None
+            if not isinstance(org, Department):
+                dept = self.parse_dept(members[0], org, optional=True,
+                                       with_aka=True)
             per = self.parse_person(members[0], optional=bool(dept),
                                     principal=members[0].delim == '+',
                                     with_aka=not dept)
@@ -387,11 +389,12 @@ class ModelParser(object):
                 assert dept
                 self.parse_org_extra(members[0], dept)
         else:
-            # If more than one person, if "common" is not a company then it
-            # must be a family.  If it is a company, then each member parts may
-            # define a person and/or department.  If a family, then each member
-            # part may only define a person.
-            org = self.parse_org(common, optional=True)
+            # If more than one person, if "common" is not a company or
+            # department then it must be a family.  If it is a company, then
+            # each member part must define either a person and/or department.
+            # If it is a department, then each member must define a person.  If
+            # a family, then each member part must define a person.
+            org = self.parse_company_or_dept(common, optional=True)
             if org:
                 self.parse_residences(common, org)
             else:
@@ -400,7 +403,7 @@ class ModelParser(object):
                 self.parse_residences(common, fam)
             for member in members:
                 member.dept = None
-                if org:
+                if org and not isinstance(org, Department):
                     member.dept = self.parse_dept(member, org, optional=True,
                                                   with_aka=True)
                 member.person = self.parse_person(member,
@@ -471,26 +474,31 @@ class ModelParser(object):
                     part.place = place
                     found_in = True
 
-    def parse_org(self, part, optional=False):
-        r'''Parse an organisation (company) and any department thereof.
+    def parse_company_or_dept(self, part, optional=False):
+        r'''Parse a company and/or any department thereof.
         '''
-        if optional and 'co' not in part:
-            return None
-        name = multilang.optparse(part.getvalue('co'))
-        aka = map(multilang.optparse, part.mgetvalue('aka', []))
-        # The preferred name is the one that appears first in the input.
-        prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
-        org = self.model.register(Company(name=name, aka=aka, prefer=prefer))
-        org.place = part.place
-        dept = self.parse_dept(part, org, optional=True, with_aka=False)
-        return dept if dept else org
+        company = None
+        if 'co' in part:
+            name = multilang.optparse(part.getvalue('co'))
+            aka = map(multilang.optparse, part.mgetvalue('aka', []))
+            # The preferred name is the one that appears first in the input.
+            prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
+            company = self.model.register(Company(name=name, aka=aka,
+                                                  prefer=prefer))
+            company.place = part.place
+        dept = self.parse_dept(part, company, optional=company or optional,
+                               with_aka=not company)
+        org = dept or company
+        if not org and not optional:
+            raise InputError('missing company or department', line=part)
+        return org
 
-    def parse_dept(self, part, org, optional=False, with_aka=False):
+    def parse_dept(self, part, company=None, optional=False, with_aka=False):
         r'''Parse a department and connect it to its parent organisation.
         '''
         if optional and 'de' not in part:
             return None
-        name = part.getvalue('de')
+        name = multilang.optparse(part.getvalue('de'))
         aka = []
         if with_aka:
             aka = map(multilang.optparse, part.mgetvalue('aka', []))
@@ -498,8 +506,10 @@ class ModelParser(object):
         dept = self.model.register(Department(name=name, aka=aka,
                                               prefer=prefer))
         dept.place = part.place
+        if not company:
+            company = self.find(Company, part.getvalue('of'))
         try:
-            Has_department(org, dept)
+            Has_department(company, dept)
         except ValueError, e:
             raise InputError(e, line=name)
         return dept
