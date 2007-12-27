@@ -34,6 +34,13 @@ class _Treebuf(object):
     def sub(self):
         return _Sub_Treebuf(self)
 
+class _Sub_Treebuf(_Treebuf):
+
+    def __init__(self, tl):
+        self.__dict__.update(tl._tl._kwargs)
+        self._tl = tl._tl
+        self._level = tl._level + 1
+
 class Treebuf(_Treebuf):
 
     r'''A treebuf accumulates tree-structured text to be rendered later.
@@ -48,13 +55,6 @@ class Treebuf(_Treebuf):
     def __unicode__(self):
         return self.as_text()
 
-class _Sub_Treebuf(Treebuf):
-
-    def __init__(self, tl):
-        self.__dict__.update(tl._tl._kwargs)
-        self._tl = tl._tl
-        self._level = tl._level + 1
-
 class Tree_Text_Renderer(object):
 
     def __init__(self, width=80, indent=3):
@@ -63,6 +63,7 @@ class Tree_Text_Renderer(object):
         self._output = []
         self._level = 0
         self._wrapmargin = 0
+        self._column = 0
 
     def set_level(self, level):
         self._level = level
