@@ -7,7 +7,7 @@ from six.node import *
 from six.text import *
 from six.uniq import uniq
 
-__all__ = ['SortItem', 'Itemiser']
+__all__ = ['SortItem', 'Itemiser', 'cull_references']
 
 class Itemiser(object):
     r'''An Itemiser is a set-like object to which nodes may be added, and
@@ -111,3 +111,37 @@ class SortItem(object):
         if self.single is not self:
             r.append('single=%r' % self.single)
         return '%s(%s)' % (self.__class__.__name__, ', '.join(r))
+
+def cull_references(itemlist, horizon=8):
+    r'''Cull unnecessary references from a sorted list of Items.
+    '''
+    # Remove entries that reference a nearby entry.  The horizon is a
+    # heuristic for how far we expect a user will search around for an entry
+    # which is out of order.
+    for i, item in enumerate(itemlist):
+        if item is item.single:
+            lim = 0
+            for j in xrange(i - 1, -1, -1):
+                if itemlist[j].sortkey[:3] != item.sortkey[:3]:
+                    break
+                if itemlist[j].node:
+                    lim += 1
+                    if lim > horizon:
+                        break
+                    if itemlist[j].node is item.node:
+                        itemlist[j].node = None
+    # Remove top-level entries that reference the same entry as another nearby,
+    # prior entry.
+    for i, item in enumerate(itemlist):
+        if item is not item.single:
+            lim = 0
+            for j in xrange(i - 1, -1, -1):
+                if itemlist[j].sortkey[:3] != item.sortkey[:3]:
+                    break
+                if itemlist[j].node:
+                    lim += 1
+                    if lim > horizon:
+                        break
+                    if itemlist[j].node is item.node:
+                        item.node = None
+                        break

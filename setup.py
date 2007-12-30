@@ -8,6 +8,6 @@ setup(name='six',
       description='Network database of personal contacts',
       author='Andrew Bettison',
       author_email='andrewb@zip.com.au',
-      packages=['six'],
+      packages=['six', 'six/reports'],
       scripts=['scripts/six']
      )
