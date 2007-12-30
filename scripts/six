@@ -211,7 +211,7 @@ def report_dump(options, model, predicate, local, encoding):
     # Departments, whether selected or not, are always listed within the entry
     # of the company to which they belong.  So any other entries to such
     # departments must be in the form of a reference to the company.  So we
-    # mark them as "seen" except for the company in which they musut appear.
+    # mark them as "seen" except for the company in which they must appear.
     # Departments that are included in the top-level listing must be replaced
     # by an alias to the company in which they will be listed.
     for node in list(itemiser):
@@ -565,9 +565,10 @@ def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
             refonly = link.family in seen
             if refonly:
                 tree.add('-> ')
+                tree.add(link.family.sort_keys().next())
             else:
                 tree.add('-- ')
-            add_name(link.family, tree, link)
+                add_name(link.family, tree, link)
             tree.nl()
             sub = tree.sub()
             dump_comments(link, sub)
@@ -585,7 +586,10 @@ def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
                 tree.add('-- ')
             if link.position:
                 tree.add(link.position, ', ')
-            add_name(link.org, tree, link)
+            if refonly:
+                tree.add(link.org.sort_keys().next())
+            else:
+                add_name(link.org, tree, link)
             tree.nl()
             sub = tree.sub()
             dump_comments(link, sub)
@@ -665,6 +669,8 @@ def dump_works_at(org, tree, seen):
         if refonly:
             tree.add('-> ')
             tree.add(link.person.sort_keys().next())
+            if link.position:
+                tree.add(', ', link.position)
             tree.nl()
         else:
             tree.add('-- ')
