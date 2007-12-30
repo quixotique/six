@@ -95,6 +95,12 @@ class Person(NamedNode):
             for aka in self.aka:
                 yield aka
 
+    def complete_name(self):
+        r'''Return the most complete form of the person's name, omitting any
+        pieces that we don't know.
+        '''
+        return self.name.complete_name()
+
     def familiar_name(self):
         r'''Return the person's name as used in a familiar context.
         '''
@@ -138,8 +144,7 @@ class Person(NamedNode):
             return None, None
         assert len(families) == 1
         assert families[0].person is self
-        return families[0], families[0].family
-
+        return families[0], families[0].family 
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.name)
 

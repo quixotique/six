@@ -111,6 +111,7 @@ class Booklet(object):
                     topMargin=0, bottomMargin=0,
                 )
         self.flowables = []
+        self._stack = []
 
     def write_pdf_to(self, path):
         r'''Generate the PDF for the booklet, writing it to a file with the
@@ -132,6 +133,7 @@ class Booklet(object):
             self.flowables.append(FrameBreak())
         self.entry = []
         self.indent = 0
+        self._empty_flag = True
         if item is not item.single:
             self.entry.append(
                 Paragraph(escape_xml(item.key) +
@@ -155,7 +157,43 @@ class Booklet(object):
         self.entry.append(Rule(height=.5, spaceBefore=rulegap, spaceAfter=1))
         self.flowables.append(KeepTogether(self.entry))
 
+    def test_is_empty(self, func):
+        r'''Return true if invoking the given callable would produce any
+        important content, such as comments, birthday, contacts or addresses.
+        '''
+        self._stack.append((self.entry, self.indent, self._empty_flag))
+        self.entry = []
+        self._empty_flag = True
+        func()
+        ret = self._empty_flag
+        self.entry, self.indent, self._empty_flag = self._stack.pop()
+        return ret
+
+    def if_not_empty(self, func):
+        r'''Append content to the current entry by calling func(), but if func
+        tests as empty, then do not append anything.
+        '''
+        self._stack.append((self.entry, self.indent, self._empty_flag))
+        self.entry = []
+        self._empty_flag = True
+        func()
+        if not self._empty_flag:
+            top = self._stack.pop()
+            self.entry = top[0] + self.entry
+            self._empty_flag = top[2]
+            return True
+        self.entry, self.indent, self._empty_flag = self._stack.pop()
+        return False
+
+    def _is_not_empty(self):
+        r'''Called by any method whenever it outputs important information.
+        Used internally to implement self.test_is_empty().
+        '''
+        self._empty_flag = False
+
     def _para(self, text, style, bullet='', proud=False, returnIndent=0):
+        r'''Append a paragraph to the current entry.
+        '''
         lefti = style.leftIndent + 12 * self.indent + returnIndent
         firsti = style.firstLineIndent - returnIndent
         if bullet:
@@ -205,6 +243,7 @@ class Booklet(object):
                                                show_work=True):
         self.add_comments(per)
         if per.birthday():
+            self._is_not_empty()
             self._para(unicode(multilang(en='Birthday', es='Fecha nac.')) +
                            ': ' + unicode(per.birthday()),
                        birthday_style)
@@ -232,11 +271,14 @@ class Booklet(object):
             for link in per.links(outgoing & is_link(Works_at)):
                 position = ''
                 if link.position:
+                    self._is_not_empty()
                     position = escape_xml(link.position) + ', '
                 if isinstance(link.org, Residence):
+                    self.indent += 1
                     self.add_address(link, link.org,
                             prefix=u'<i>' + unicode(qual_work).capitalize() +
                                    u':</i> ')
+                    self.indent -= 1
                 elif link.org in refs:
                     self.add_names([link.org.sort_keys().next()],
                                    bullet=RIGHT_ARROW, bold=False,
@@ -261,6 +303,7 @@ class Booklet(object):
         self.indent -= 1
         refs = refs | set([fam])
         if show_members:
+            omitted = []
             for link in sorted(fam.links(incoming & is_link(Belongs_to)),
                                key=lambda l: (not l.is_head,
                                               l.sequence or 0,
@@ -273,15 +316,36 @@ class Booklet(object):
                     self.add_contacts(link, context=At_home)
                     self.indent -= 2
                 else:
-                    names = list(link.person.names(with_aka=False))
-                    hn = link.person.family_head_name()
-                    names = [n for n in names
-                             if hn != n and not hn.startswith(n + ' ')] or names
-                    self.add_names(names, bullet=EM_DASH)
-                    self.indent += 1
-                    self.add_comments(link)
-                    self.add_person(link.person, refs, link, show_family=False)
-                    self.indent -= 1
+                    def add_member():
+                        anames = list(link.person.names(with_aka=False))
+                        names = []
+                        if link.is_head:
+                            hn = link.person.family_head_name()
+                            names = [n for n in names
+                                     if hn != n and not hn.startswith(n + ' ')]
+                        if names:
+                            self._is_not_empty()
+                        else:
+                            names = anames
+                        self.add_names(names, bullet=EM_DASH)
+                        self.indent += 1
+                        self.add_comments(link)
+                        self.add_person(link.person, refs, link,
+                                        show_family=False)
+                        self.indent -= 1
+                    if not self.if_not_empty(add_member):
+                        omitted.append(link)
+                        print 'omitted %r from %r' % (link.person.names().next(), fam.names().next())
+            # Omitted family members who are not heads will not be mentioned
+            # anywhere unless we list them here.
+            plus = [link.person for link in omitted if not link.is_head]
+            if plus:
+                self._is_not_empty()
+                self.indent += 1
+                self._para((' +' + NBSP).join(per.complete_name()
+                                              for per in plus),
+                           name_style, bullet='+ ', proud=True)
+                self.indent -= 1
 
     def add_organisation(self, org, refs, link=None, show_workers=True,
                          show_departments=True):
@@ -295,6 +359,7 @@ class Booklet(object):
             self.add_works_at(org, refs)
         if show_departments:
             for link in org.links(outgoing & is_link(Has_department)):
+                self._is_not_empty()
                 if link.dept in refs:
                     self.add_names([link.dept.sort_keys().next()],
                                    bullet=RIGHT_ARROW,
@@ -316,6 +381,7 @@ class Booklet(object):
             if link.person in refs:
                 name = link.person.sort_keys().next()
                 if link.position:
+                    self._is_not_empty()
                     name += ', ' + link.position
                 self.add_names([name], bullet=RIGHT_ARROW,
                                comments=self.all_comments(link))
@@ -336,6 +402,7 @@ class Booklet(object):
 
     def add_comments(self, *nodes):
         for com in self.all_comments(*nodes):
+            self._is_not_empty()
             self._para(unicode(com), comment_style)
 
     def add_contacts(self, *nodes, **kwargs):
@@ -348,6 +415,7 @@ class Booklet(object):
         for node in filter(bool, nodes):
             for typ in Has_mobile, Has_fixed, Has_fax, Has_email:
                 for link in node.links(outgoing & is_link(typ)):
+                    self._is_not_empty()
                     label = ''
                     if isinstance(link, Has_email):
                         cnode = link.email
@@ -406,6 +474,7 @@ class Booklet(object):
                 self.add_address(link, link.node2)
 
     def add_address(self, link, addr, prefix=''):
+        self._is_not_empty()
         self._para(prefix + addr.as_unicode(with_country=False),
                    address_style)
         self.indent += 1
