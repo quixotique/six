@@ -86,6 +86,14 @@ class sortstr(unicode):
         '''
         return self[self.sortslice]
 
+    def sortsplit(self):
+        r'''Return the three-tuple (self[:self.sortslice.start],
+        self.sortstr(), self[self.sortslice.stop:]).
+        '''
+        return (self[:self.sortslice.start],
+                self.sortstr(),
+                self[self.sortslice.stop:])
+
     def __repr__(self):
         r = [repr(unicode(self))]
         if self.sortslice != slice(len(self)):

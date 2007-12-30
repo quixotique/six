@@ -41,6 +41,9 @@ def main():
     op.add_option('-r', '--report',
                   action='store', type='string', dest='report',
                   help='select output report, REPORT is one of: dump, phone')
+    op.add_option('-o', '--output',
+                  action='store', type='string', dest='output_path',
+                  help='write output to file pathname instead of stdout')
     op.add_option('-a', '--all',
                   action='store_true', dest='all',
                   help='print all possible values')
@@ -180,6 +183,12 @@ class EnvError(InputError):
         r.append(StandardError.__str__(self))
         return ': '.join(r)
 
+def report_book(options, model, predicate, local, encoding):
+    if not options.output_path:
+        raise InputError('missing --output option')
+    options.pdf = True
+    report_dump(options, model, predicate, local, encoding)
+
 def report_dump(options, model, predicate, local, encoding):
     # If no predicate given, then select all people, organisations, and
     # families.
@@ -284,36 +293,48 @@ def report_dump(options, model, predicate, local, encoding):
                         item.node = None
                         break
     # Now format the report.
-    from six.output import Treebuf
-    tree = Treebuf(local=local)
-    for item in toplevel:
-        if item.node is None:
-            pass
-        elif item is not item.single:
-            tree.nl()
-            tree.add(item.key, ' -> ', item.single.key)
-            tree.nl()
-        elif isinstance(item.node, Person):
-            tree.nl()
-            dump_names(item.node, tree, name=item.key)
-            dump_person(item.node, tree.sub(),
-                        seen - see_in.get(item.node, set()))
-        elif isinstance(item.node, Family):
-            tree.nl()
-            dump_names(item.node, tree, name=item.key)
-            dump_family(item.node, tree.sub(),
-                        seen - see_in.get(item.node, set()))
-        elif isinstance(item.node, Department):
-            tree.nl()
-            dump_names(item.node, tree, name=item.key)
-            dump_organisation(item.node, tree.sub(),
-                              seen - see_in.get(item.node, set()))
-        elif isinstance(item.node, Organisation):
-            tree.nl()
-            dump_names(item.node, tree, name=item.key)
-            dump_organisation(item.node, tree.sub(),
-                              seen - see_in.get(item.node, set()))
-    print unicode(tree).encode(encoding, 'replace')
+    if getattr(options, 'pdf', False):
+        from six.pdf import Booklet
+        booklet = Booklet(local=local)
+        for item in toplevel:
+            if item.node is not None:
+                booklet.add_entry(item, seen - see_in.get(item.node, set()))
+        booklet.write_pdf_to(options.output_path)
+    else:
+        from six.output import Treebuf
+        tree = Treebuf(local=local)
+        for item in toplevel:
+            if item.node is None:
+                pass
+            elif item is not item.single:
+                tree.nl()
+                tree.add(item.key, ' -> ', item.single.key)
+                tree.nl()
+            elif isinstance(item.node, Person):
+                tree.nl()
+                dump_names(item.node, tree, name=item.key)
+                dump_person(item.node, tree.sub(),
+                            seen - see_in.get(item.node, set()))
+            elif isinstance(item.node, Family):
+                tree.nl()
+                dump_names(item.node, tree, name=item.key)
+                dump_family(item.node, tree.sub(),
+                            seen - see_in.get(item.node, set()))
+            elif isinstance(item.node, Department):
+                tree.nl()
+                dump_names(item.node, tree, name=item.key)
+                dump_organisation(item.node, tree.sub(),
+                                  seen - see_in.get(item.node, set()))
+            elif isinstance(item.node, Organisation):
+                tree.nl()
+                dump_names(item.node, tree, name=item.key)
+                dump_organisation(item.node, tree.sub(),
+                                  seen - see_in.get(item.node, set()))
+        if options.output_path:
+            ofile = file(options.output_path, 'w')
+        else:
+            ofile = sys.stdout
+        ofile.write(unicode(tree).encode(encoding, 'replace'))
 
 def report_email(options, model, predicate, local, encoding):
     if predicate is None:

@@ -30,9 +30,14 @@ class Address(Node):
         from six.links import Is_in
         Is_in(self, place)
 
+    def as_unicode(self, with_country=True):
+        lines = list(self.lines)
+        if with_country:
+            lines.append(unicode(self.place.country).upper())
+        return u'; '.join(lines)
+
     def __unicode__(self):
-        return u'; '.join(list(self.lines) +
-                          [unicode(self.place.country).upper()])
+        return self.as_unicode(with_country=True)
 
     def __str__(self):
         return str(unicode(self))
