@@ -482,7 +482,7 @@ class InputError(StandardError):
     '''
 
     def __init__(self, msg, **kwargs):
-        StandardError.__init__(self, msg)
+        StandardError.__init__(self, unicode(msg).encode('ascii', 'replace'))
         if len(kwargs) != 1:
             raise TypeError('%s() expects single keyword arg' %
                             self.__class__.__name__)
