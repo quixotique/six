@@ -83,7 +83,7 @@ class Address(Node):
         place.area, otherwise InputError is raised.
 
             >>> w = World()
-            >>> es = Country('ES', 'es', '34', multilang(en='Spain', es='España'))
+            >>> es = Country('ES', 'es', '34', multilang(en='Spain', es=u'España'))
             >>> w.add(es)
             >>> au = Country('AU', 'en', '61', multilang('Australia'))
             >>> sa = Area(au, '8', multilang('SA'), multilang('South Australia'))
@@ -110,17 +110,17 @@ class Address(Node):
             >>> b == a
             True
 
-            >>> a, com = Address.parse('C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, place=Place(au))
+            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, place=Place(au))
             Traceback (most recent call last):
             InputError: address must be in Australia
 
-            >>> a, com = Address.parse('C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, default_place=Place(au))
+            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, default_place=Place(au))
             >>> a.only_place().country is es
             True
             >>> a.only_place().area is None
             True
 
-            >>> a, com = Address.parse('C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, place=Place(sa))
+            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, place=Place(sa))
             Traceback (most recent call last):
             InputError: address must be in Australia
 
@@ -128,13 +128,13 @@ class Address(Node):
             Traceback (most recent call last):
             InputError: address must be in SA
 
-            >>> a, com = Address.parse('C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, default_place=Place(sa))
+            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, default_place=Place(sa))
             >>> a.only_place().country is es
             True
             >>> a.only_place().area is None
             True
 
-            >>> a, com = Address.parse('C/ Bienandanza, 6; 45216 SA; ESPAÑA', w, default_place=Place(sa))
+            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 SA; ESPAÑA', w, default_place=Place(sa))
             >>> a.only_place().country is es
             True
             >>> a.only_place().area is None
