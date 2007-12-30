@@ -11,14 +11,11 @@ packages contained within them.
 import sys
 sys.path.pop(0)
 import locale
-import codecs
 import os
 import os.path
 import cPickle as pickle
 import errno
 from optparse import OptionParser
-from collections import defaultdict
-from itertools import chain
 import six.parse as parse
 from six.test import run_doctest
 from six.input import InputError
@@ -158,9 +155,6 @@ def opt_doctest(option, opt_str, value, parser, *args, **kwargs):
                            verbose=options.verbose):
             status = 1
     sys.exit(status)
-
-class InputError(StandardError):
-    pass
 
 class ArgError(InputError):
 
