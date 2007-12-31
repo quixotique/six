@@ -682,6 +682,7 @@ class ModelParser(object):
         delimiter, in make_assoc().
         '''
         wat = self.make_assoc(part, who, org, Works_at)
+        self.parse_con(part, wat, 'comw', Comment, Has_comment)
         self.parse_contacts_work(part, wat)
         return wat
 
