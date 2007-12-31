@@ -33,76 +33,53 @@ def report_book(options, model, predicate, local, encoding):
     # predicate.
     itemiser = Itemiser()
     itemiser.update(model.nodes(predicate))
-    # Add nodes that are implied by the predicate:
-    # - A selected person implies the family they belong to.
-    for node in list(itemiser):
-        itemiser.update(node.nodes(outgoing & is_link(Belongs_to)))
-    # - A selected department imples its parent company (but not intermediate
-    #   departments).
+    # Top level references.  A dictionary that maps top level node to the node
+    # in whose entry it appears.
+    refs = dict()
+    # Add top level nodes that are implied by the predicate:
+    # - A selected department imples its parent company and all intermediate
+    #   departments.  Departments are always listed within the entry of their
+    #   parent company, so they are never listed as top level entries.  Any
+    #   Departments at the top level are there because they were selected by
+    #   the predicate, so these are converted into references to their
+    #   company's entry.
     for node in list(itemiser):
         if isinstance(node, Department):
-            itemiser.update(n for n in node.all_parents()
-                                  if isinstance(n, Company))
-    # - A family implies all its members, and an organisation (company or
-    #   department) implies all the people who work for it.
+            dept = node
+            com = dept.company()
+            itemiser.discard(dept)
+            itemiser.add(com)
+            assert dept not in refs
+            refs[dept] = com
+    # Add top level nodes that are implied by the predicate:
+    # - A selected person implies the family(ies) they belong to.  If a person
+    #   belongs to only one family, then that person's top level entry becomes
+    #   a reference to their family.
     for node in list(itemiser):
-        itemiser.update(node.nodes(incoming &
-                                 (is_link(Belongs_to) | is_link(Works_at))))
-    # These sets control where entries are listed.
-    seen = set(itemiser)
-    see_in = defaultdict(set)
-    alias = dict()
-    # Departments, whether selected or not, are always listed within the entry
-    # of the company to which they belong.  So any other entries to such
-    # departments must be in the form of a reference to the company.  So we
-    # mark them as "seen" except for the company in which they must appear.
-    # Departments that are included in the top-level listing must be replaced
-    # by an alias to the company in which they will be listed.
-    for node in list(itemiser):
-        if isinstance(node, Organisation):
-            depts = list(node.nodes(outgoing & is_link(Has_department)))
-            for dept in depts:
-                if dept in seen:
-                    itemiser.discard(dept)
-                    alias[dept] = node
-            seen.update(depts)
-            see_in[node].update(depts)
-    # Remove top-level entries for certain people.
-    for node in seen:
         if isinstance(node, Person):
             person = node
-            # People who are heads of organisations keep their own entry.
-            works_at = list(person.links(outgoing & is_link(Works_at)))
-            if [wat for wat in works_at if wat.is_head]:
-                continue
             # Omit top-level entries for people who belong to a single family
             # or who work for a single organisation, if the family/org has its
             # own top-level entry.  Instead, their details will get listed
-            # within that entry.  The names of heads of families get turned
-            # into aliases for the family.
+            # within that entry.  Any top level entries for heads of families
+            # get turned into aliases for the family.
             belongs_to = list(person.links(outgoing & is_link(Belongs_to)))
             if len(belongs_to) == 1 and belongs_to[0].family in itemiser:
                 itemiser.discard(person)
-                see_in[belongs_to[0].family].add(person)
-                if belongs_to[0].is_head:
-                    alias[person] = belongs_to[0].family
-            elif len(works_at) == 1:
-                orgs = [org for org in chain([works_at[0].org],
-                                             works_at[0].org.all_parents())
-                                    if org in itemiser]
-                itemiser.discard(person)
-                for org in orgs:
-                    see_in[org].add(person)
-    # Form the sorted index of all the top-level entries in the report.
+                if belongs_to[0].is_head and person in refs:
+                    refs[person] = belongs_to[0].family
+    # Form the sorted index of all the top-level entries in the report, and
+    # the 'refs' dictionary.
     toplevel = sorted(chain(itemiser.items(),
-                            itemiser.alias_items(alias.iteritems())))
+                            itemiser.alias_items(refs.iteritems())))
+    refs.update(zip(itemiser, itemiser))
     # Remove unnecessary references.
     cull_references(toplevel)
     # Format the report.
-    booklet = Booklet(local=local)
+    booklet = Booklet(refs=refs, local=local)
     for item in toplevel:
         if item.node is not None:
-            booklet.add_entry(item, seen - see_in.get(item.node, set()))
+            booklet.add_entry(item)
     booklet.write_pdf_to(options.output_path)
 
 from xml.sax.saxutils import escape as escape_xml
@@ -178,7 +155,8 @@ class Booklet(object):
     designed to be cut to size and bound in a filofax.
     '''
 
-    def __init__(self, local):
+    def __init__(self, refs, local):
+        self.refs = refs
         self.local = local
         self.section = 0
         self.page = PageTemplate(
@@ -210,7 +188,7 @@ class Booklet(object):
         self.flowables.append(ActionFlowable(('newSection', sections[section])))
         self.section = section
 
-    def add_entry(self, item, refs):
+    def add_entry(self, item):
         letter = text_sort_key(item.key)[:1].upper() or 'Z'
         section = self.section
         while letter not in sections[section]:
@@ -222,22 +200,16 @@ class Booklet(object):
         self.indent = 0
         self._empty_flag = True
         if item is not item.single:
-            self.entry.append(
-                Paragraph(escape_xml(item.key) +
-                    (u' <font size="%d">' % (toplevel_ref_style.leading - 2)) +
-                    RIGHT_ARROW + u' ' +
-                    escape_xml(item.single.key) +
-                    u'</font>',
-                    toplevel_ref_style))
+            self.add_names([item.key], refname=item.single.key, bold=False)
             rulegap = 4
         else:
             self.add_names([item.key] + list(item.node.names()))
             if isinstance(item.node, Person):
-                self.add_person(item.node, refs)
+                self.add_person(item.node)
             elif isinstance(item.node, Family):
-                self.add_family(item.node, refs)
+                self.add_family(item.node)
             elif isinstance(item.node, Company):
-                self.add_organisation(item.node, refs)
+                self.add_organisation(item.node)
             else:
                 assert False, repr(item.node)
             rulegap = 2
@@ -295,28 +267,30 @@ class Booklet(object):
                         firstLineIndent=firsti)
         self.entry.append(Paragraph(bullet + text, istyle))
 
-    def add_names(self, names, bullet='', bold=True, prefix='', comments=()):
-        if bold:
-            startbold, endbold = '<b>', '</b>'
-        else:
-            startbold, endbold = '', ''
+    def add_names(self, names, refname=None, bullet='', bold=True,
+                  prefix='', suffix='', comments=()):
         names = uniq(names)
         first = names.next()
+        if bold:
+            startbold, endbold = u'<b>', u'</b>'
+        else:
+            startbold, endbold = u'', u''
         if hasattr(first, 'sortsplit'):
             pre, sort, post = first.sortsplit()
-            name = ''.join([escape_xml(pre),
-                            startbold,
-                            escape_xml(sort),
-                            endbold,
-                            escape_xml(post)])
+            name = u''.join([escape_xml(pre),
+                             startbold, escape_xml(sort), endbold,
+                             escape_xml(post)])
         else:
             name = startbold + escape_xml(unicode(first)) + endbold
         first = unicode(first)
-        para = [prefix, name]
+        para = [prefix, name, suffix]
         for aka in map(unicode, names):
             if aka != first:
                 para += [u' <font size="%d">=' % (name_style.fontSize - 2),
                          NBSP, escape_xml(aka), u'</font>']
+        if refname:
+            para += [(u' <font size="%d">' % (toplevel_ref_style.leading - 2)),
+                     RIGHT_ARROW, u' ', escape_xml(refname), u'</font>']
         if bullet:
             bullet = bullet + ' '
         if comments:
@@ -326,7 +300,7 @@ class Booklet(object):
                      u'</i></font>']
         self._para(u''.join(para), name_style, bullet=bullet)
 
-    def add_person(self, per, refs, link=None, show_family=True,
+    def add_person(self, per, link=None, show_family=True,
                                                show_work=True):
         self.add_comments(per)
         if per.birthday():
@@ -338,71 +312,78 @@ class Booklet(object):
         self.add_addresses(per)
         self.add_contacts(per, link)
         self.indent -= 1
-        refs = refs | set([per])
         if show_family:
             for link in per.links(outgoing & is_link(Belongs_to)):
-                if link.family in refs:
+                # If this person's family has no top level entry, or has a top
+                # level reference to this person, then list the family here.
+                # Otherwise, just list a reference to the family.
+                top = self.refs.get(link.family, per)
+                if top is per:
+                    self.add_names(link.family.names(), bullet=EM_DASH)
+                    self.indent += 1
+                    self.add_comments(link)
+                    self.add_family(link.family, link, show_members=False)
+                    self.indent -= 1
+                else:
                     self.add_names([link.family.sort_keys().next()],
                                    bullet=RIGHT_ARROW, bold=False,
                                    comments=self.all_comments(link))
                     self.indent += 2
                     self.add_contacts(link, context=At_home)
                     self.indent -= 2
-                else:
-                    self.add_names(link.family.names(), bullet=EM_DASH)
-                    self.indent += 1
-                    self.add_comments(link)
-                    self.add_family(link.family, refs, link, show_members=False)
-                    self.indent -= 1
         if show_work:
             for link in per.links(outgoing & is_link(Works_at)):
                 position = ''
                 if link.position:
                     self._is_not_empty()
-                    position = escape_xml(link.position) + ', '
-                if isinstance(link.org, Residence):
-                    self.indent += 1
-                    self.add_address(link, link.org,
-                            prefix=u'<i>' + unicode(qual_work).capitalize() +
-                                   u':</i> ')
-                    self.indent -= 1
-                elif link.org in refs:
+                    position = escape_xml(unicode(link.position)) + ', '
+                # If the organisation/residence where this person works has no
+                # top level entry or has a top level reference to this person,
+                # then list the organisation/residence here.  Otherwise, just
+                # list a reference to its top level entry.
+                top = self.refs.get(link.org, per)
+                if top is per:
+                    if isinstance(link.org, Residence):
+                        self.indent += 1
+                        self.add_address(link, link.org,
+                                prefix=u'<i>' + unicode(qual_work).capitalize() +
+                                       u':</i> ')
+                        self.indent -= 1
+                    else:
+                        self.add_names(link.org.names(), bullet=EM_DASH,
+                                       prefix=position)
+                        self.indent += 1
+                        self.add_comments(link)
+                        self.add_organisation(link.org, link, show_parents=True,
+                                              show_workers=False)
+                        self.indent -= 1
+                else:
                     self.add_names([link.org.sort_keys().next()],
                                    bullet=RIGHT_ARROW, bold=False,
+                                   prefix=position,
                                    comments=self.all_comments(link))
                     self.indent += 2
                     self.add_contacts(link, context=At_work)
                     self.indent -= 2
-                else:
-                    self.add_names(link.org.names(), bullet=EM_DASH,
-                                   prefix=position)
-                    self.indent += 1
-                    self.add_comments(link)
-                    self.add_organisation(link.org, refs, link,
-                                          show_workers=False)
-                    self.indent -= 1
 
-    def add_family(self, fam, refs, link=None, show_members=True):
+    def add_family(self, fam, link=None, show_members=True):
         self.add_comments(fam)
         self.indent += 1
         self.add_addresses(fam)
         self.add_contacts(fam, link)
         self.indent -= 1
-        refs = refs | set([fam])
         if show_members:
             omitted = []
             for link in sorted(fam.links(incoming & is_link(Belongs_to)),
                                key=lambda l: (not l.is_head,
                                               l.sequence or 0,
                                               l.person.sortkey())):
-                if link.person in refs:
-                    self.add_names([link.person.sort_keys().next()],
-                                   bullet=RIGHT_ARROW,
-                                   comments=self.all_comments(link))
-                    self.indent += 2
-                    self.add_contacts(link, context=At_home)
-                    self.indent -= 2
-                else:
+                # If this member has no top level entry, or has a top level
+                # reference to this family, then list the member here.
+                # Otherwise, just list a reference to the entry where the
+                # person is listed.
+                top = self.refs.get(link.person, fam)
+                if top is fam:
                     def add_member():
                         anames = list(link.person.names(with_aka=False))
                         names = []
@@ -417,12 +398,26 @@ class Booklet(object):
                         self.add_names(names, bullet=EM_DASH)
                         self.indent += 1
                         self.add_comments(link)
-                        self.add_person(link.person, refs, link,
-                                        show_family=False)
+                        self.add_person(link.person, link, show_family=False)
                         self.indent -= 1
                     if not self.if_not_empty(add_member):
                         omitted.append(link)
-                        print 'omitted %r from %r' % (link.person.names().next(), fam.names().next())
+                elif top is link.person:
+                    self.add_names([link.person.sort_keys().next()],
+                                   bullet=RIGHT_ARROW,
+                                   comments=self.all_comments(link))
+                    self.indent += 2
+                    self.add_contacts(link, context=At_home)
+                    self.indent -= 2
+                else:
+                    self.add_names([link.person.sort_keys().next()],
+                                   bullet=EM_DASH,
+                                   comments=self.all_comments(link))
+                    self.indent += 2
+                    self.add_contacts(link, context=At_home)
+                    self.add_names([top.sort_keys().next()],
+                                   bullet=RIGHT_ARROW, bold=False)
+                    self.indent -= 2
             # Omitted family members who are not heads will not be mentioned
             # anywhere unless we list them here.
             plus = [link.person for link in omitted if not link.is_head]
@@ -434,53 +429,106 @@ class Booklet(object):
                            name_style, bullet='+ ', proud=True)
                 self.indent -= 1
 
-    def add_organisation(self, org, refs, link=None, show_workers=True,
-                         show_departments=True):
+    def add_organisation(self, org, link=None, show_workers=True,
+                         show_parents=False, show_departments=True):
         self.add_comments(org)
         self.indent += 1
+        parent = None
+        if show_parents:
+            if isinstance(org, Department):
+                # If the parent organisation has a top level entry, then refer
+                # to it.  Otherwise, we list it below.
+                parent = org.link(incoming & is_link(Has_department))
+                assert parent is not None
+                if parent.company in self.refs:
+                    self.add_names([parent.company.sort_keys().next()],
+                                   bullet=RIGHT_ARROW, bold=False,
+                                   comments=self.all_comments(parent))
+                    parent = None
         self.add_addresses(org)
         self.add_contacts(org, link)
+        if parent:
+            self.add_names([parent.company.sort_keys().next()],
+                           bullet=EM_DASH, bold=True,
+                           comments=self.all_comments(parent))
+            self.add_organisation(parent.company, parent,
+                                  show_departments=False,
+                                  show_workers=show_workers)
         self.indent -= 1
-        refs = refs | set([org])
         if show_workers:
-            self.add_works_at(org, refs)
+            self.add_works_at(org)
         if show_departments:
             for link in org.links(outgoing & is_link(Has_department)):
+                # Departments are not supposed to have their own top level
+                # entries.  Any departments which appear at the top level can
+                # only be references to a company which has its own top level
+                # entry.
+                top = self.refs.get(link.dept)
+                if top is not None:
+                    com = org if isinstance(org, Company) else org.company()
+                    assert top is com, '%r is in %r, should be in %r' % (
+                                                            link.dept, top, com)
                 self._is_not_empty()
-                if link.dept in refs:
-                    self.add_names([link.dept.sort_keys().next()],
-                                   bullet=RIGHT_ARROW,
+                self.add_names(link.dept.names(),
+                               bullet=EM_DASH, bold=True)
+                self.indent += 1
+                self.add_comments(link)
+                self.add_organisation(link.dept, link,
+                                      show_workers=show_workers)
+                self.indent -= 1
+
+    def add_works_at(self, org):
+        for link in sorted(org.links(incoming & is_link(Works_at))):
+            # If the person has a top level reference to the company entry in
+            # which this organisation appears, or has no top level entry but is
+            # a principal of the company, then list the person here.
+            # Otherwise, list a reference to the entry where the person is
+            # listed.
+            com = org if isinstance(org, Company) else org.company()
+            top = self.refs.get(link.person)
+            position = ''
+            if link.position:
+                self._is_not_empty()
+                position = ', ' + escape_xml(unicode(link.position))
+            if top is com or (top is None and link.is_head):
+                self._is_not_empty()
+                # Special case: if the person has no top level entry but
+                # belongs to a family that does, then list a reference to that
+                # family.
+                for linkf in link.person.links(outgoing & is_link(Belongs_to)):
+                    if linkf.family in self.refs:
+                        self.add_names([link.person.sort_keys().next()],
+                                       suffix=position,
+                                       refname=linkf.family.sort_keys().next(),
+                                       bullet=RIGHT_ARROW,
+                                       comments=self.all_comments(link))
+                        self.indent += 2
+                        self.add_contacts(link, context=At_work)
+                        self.indent -= 2
+                        break
+                else:
+                    self.add_names(link.person.names(), suffix=position,
+                                   bullet=EM_DASH,
+                                   comments=self.all_comments(link))
+                    self.indent += 1
+                    self.add_person(link.person, link, show_work=False)
+                    self.indent -= 1
+            elif top is not None:
+                name = link.person.sort_keys().next()
+                if top is link.person:
+                    self.add_names([name], bullet=RIGHT_ARROW, suffix=position,
                                    comments=self.all_comments(link))
                     self.indent += 2
                     self.add_contacts(link, context=At_work)
                     self.indent -= 2
                 else:
-                    self.add_names(link.dept.names(),
-                                   bullet=EM_DASH, bold=True)
-                    self.indent += 1
-                    self.add_comments(link)
-                    self.add_organisation(link.dept, refs, link,
-                                          show_workers=show_workers)
-                    self.indent -= 1
-
-    def add_works_at(self, org, refs):
-        for link in sorted(org.links(incoming & is_link(Works_at))):
-            if link.person in refs:
-                name = link.person.sort_keys().next()
-                if link.position:
-                    self._is_not_empty()
-                    name += ', ' + link.position
-                self.add_names([name], bullet=RIGHT_ARROW,
-                               comments=self.all_comments(link))
-                self.indent += 2
-                self.add_contacts(link, context=At_work)
-                self.indent -= 2
-            else:
-                self.add_names(link.person.names(), bullet=EM_DASH)
-                self.indent += 1
-                self.add_comments(link)
-                self.add_person(link.person, refs, link, show_work=False)
-                self.indent -= 1
+                    self.add_names([name], bullet=EM_DASH,
+                                   refname=top.sort_keys().next(),
+                                   bold=True, suffix=position,
+                                   comments=self.all_comments(link))
+                    self.indent += 2
+                    self.add_contacts(link, context=At_work)
+                    self.indent -= 2
 
     def all_comments(self, *nodes):
         for node in nodes:

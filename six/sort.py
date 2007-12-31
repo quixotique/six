@@ -18,14 +18,19 @@ class Itemiser(object):
         self._nodes = set()
         self._items = None
 
+    def add(self, node):
+        r'''Append the given Node to the itemiser.
+        '''
+        assert isinstance(node, Node)
+        if node not in self._nodes:
+            self._nodes.add(node)
+            self._items = None
+
     def update(self, nodes):
         r'''Append the given Nodes to the itemiser.
         '''
         for node in nodes:
-            assert isinstance(node, Node)
-            if node not in self._nodes:
-                self._nodes.add(node)
-                self._items = None
+            self.add(node)
 
     def discard(self, node):
         r'''Remove the given Node from the itemiser.
@@ -44,6 +49,17 @@ class Itemiser(object):
         not discarded since.
         '''
         return node in self._nodes
+
+    def __len__(self):
+        r'''Return the number of distinct Nodes added to the itemiser and not
+        discarded since.
+        '''
+        return len(self._nodes)
+
+    def __getitem__(self, node):
+        r'''Return the Node to which the given Node is a reference.
+        '''
+        self.items(node).next().single.node
 
     def items(self, node=None):
         r'''Iterate over SortItem objects, in arbitrary order, for all the

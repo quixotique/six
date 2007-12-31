@@ -95,6 +95,16 @@ class Department(Organisation):
     own distinct contact details.
     '''
 
+    def company(self):
+        r'''Return the parent Company to which this department belongs, going
+        up through all parent departments to reach it.  There must always be
+        exactly one parent company.
+        '''
+        com = list(self.find_nodes(incoming & is_link(Has_department),
+                                   select=lambda n: isinstance(n, Company)))
+        assert len(com) == 1
+        return com[0][-1]
+
 class Company(Organisation):
 
     r'''A company is a top-level organisation that can have departments but is
