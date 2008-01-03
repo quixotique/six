@@ -462,23 +462,25 @@ class Booklet(object):
             self.add_works_at(org)
         if show_departments:
             for link in org.links(outgoing & is_link(Has_department)):
-                # Departments are not supposed to have their own top level
-                # entries.  Any departments which appear at the top level can
-                # only be references to a company which has its own top level
-                # entry.
+                # Departments' top level entries are always references to their
+                # parent company's top level entry.  So we list departments
+                # here in full -- no references.  Only departments with top
+                # level entries, or are head departments, or whose link
+                # satisfies the predicate get listed.
                 top = self.refs.get(link.dept)
                 if top is not None:
                     com = org if isinstance(org, Company) else org.company()
                     assert top is com, '%r is in %r, should be in %r' % (
                                                             link.dept, top, com)
-                self._is_not_empty()
-                self.add_names(link.dept.names(),
-                               bullet=EM_DASH, bold=True)
-                self.indent += 1
-                self.add_comments(link)
-                self.add_organisation(link.dept, link,
-                                      show_workers=show_workers)
-                self.indent -= 1
+                if top or link.is_head or self.predicate(link):
+                    self._is_not_empty()
+                    self.add_names(link.dept.names(),
+                                   bullet=EM_DASH, bold=True)
+                    self.indent += 1
+                    self.add_comments(link)
+                    self.add_organisation(link.dept, link,
+                                          show_workers=show_workers)
+                    self.indent -= 1
 
     def add_works_at(self, org):
         for link in sorted(org.links(incoming & is_link(Works_at))):

@@ -117,7 +117,7 @@ class Has_department(Link):
     A department can only belong to a single company.
     '''
 
-    def __init__(self, company, dept, timestamp=None):
+    def __init__(self, company, dept, is_head=False, timestamp=None):
         assert isinstance(company, Company)
         assert isinstance(dept, Department)
         dups = list(dept.links(incoming & is_link(Has_department)))
@@ -127,6 +127,7 @@ class Has_department(Link):
         super(Has_department, self).__init__(company, dept, timestamp=timestamp)
         self.company = company
         self.dept = dept
+        self.is_head = bool(is_head)
 
     def only_place(self):
         r'''The place of a company is the default place of its departments.

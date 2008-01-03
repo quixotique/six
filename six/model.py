@@ -496,9 +496,14 @@ class ModelParser(object):
     def parse_dept(self, part, company=None, optional=False, with_aka=False):
         r'''Parse a department and connect it to its parent organisation.
         '''
-        if optional and 'de' not in part:
+        if optional and 'de' not in part and 'de-' not in part:
             return None
-        name = multilang.optparse(part.getvalue('de'))
+        if 'de' in part:
+            name = multilang.optparse(part.getvalue('de'))
+            is_head = True
+        else:
+            name = multilang.optparse(part.getvalue('de-'))
+            is_head = False
         aka = []
         if with_aka:
             aka = map(multilang.optparse, part.mgetvalue('aka', []))
@@ -509,7 +514,7 @@ class ModelParser(object):
         if not company:
             company = self.find(Company, part.getvalue('of'))
         try:
-            Has_department(company, dept)
+            Has_department(company, dept, is_head=is_head)
         except ValueError, e:
             raise InputError(e, line=name)
         return dept
