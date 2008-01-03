@@ -124,6 +124,10 @@ class Association(Link):
         super(Association, self).__init__(node1, node2, timestamp=timestamp)
         self.position = position
 
+    def __repr__(self):
+        return '%s(node1=%r, node2=%r)' % (type(self).__name__, self.node1,
+                                           self.node2)
+
 class With(Association):
 
     r'''A 'With' association between two nodes represents a real-world

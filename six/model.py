@@ -698,7 +698,7 @@ class ModelParser(object):
                           is_head=None):
         r'''Parse an association line, look up the referred node, and link it
         to a given node with an Association link or subclass thereof.  Parse
-        any contact details, data, and comments that pertain to the
+        any contact details, keywords, data, and comments that pertain to the
         association.
         '''
         if key in part:
@@ -710,13 +710,15 @@ class ModelParser(object):
                 if sub:
                     sub.updated = self.parse_update(sub) or part.updated
                     sub.place = part.place
-                    sub.defaults = part.defaults
+                    sub.defaults = copy.copy(part.defaults)
+                    sub.defaults.keywords = []
                 ass = self.make_assoc(sub, who, oth, ltype,
                                       timestamp=(sub or part).updated,
                                       is_head=is_head)
                 if sub:
                     if parse_sub:
                         parse_sub(sub, ass)
+                    self.parse_keywords(sub, ass)
                     self.parse_data(sub, ass)
                     self.parse_con(sub, ass, 'com', Comment, Has_comment)
 
@@ -835,10 +837,10 @@ class ModelParser(object):
                 self.parse_con(sub, r, 'fax', Telephone, Has_fax)
                 self.parse_con(sub, r, 'com', Comment, Has_comment)
 
-    def parse_keywords(self, part, who):
+    def parse_keywords(self, part, node):
         r'''Parse 'key' lines in a given part, dereferencing and creating
         Keyword nodes for each keyword parsed, and attaching the given node
-        (person, organisation) to each such Keyword node.
+        (person, organisation, Works_at, etc.) to each such Keyword node.
         '''
         omit = set()
         if 'key-' in part:
@@ -847,16 +849,16 @@ class ModelParser(object):
                     omit.add(keyword)
         for keyword in part.defaults.keywords:
             if keyword not in omit:
-                if not who.link(outgoing & is_link(Keyed_with) &
+                if not node.link(outgoing & is_link(Keyed_with) &
                                 to_node(keyword)):
-                    Keyed_with(who, keyword, timestamp=part.updated)
+                    Keyed_with(node, keyword, timestamp=part.updated)
         if 'key' in part:
             for text in part.mgetvalue('key'):
                 for keyword in self.split_keywords(text):
                     if keyword not in omit:
-                        if not who.link(outgoing & is_link(Keyed_with) &
+                        if not node.link(outgoing & is_link(Keyed_with) &
                                         to_node(keyword)):
-                            Keyed_with(who, keyword, timestamp=part.updated)
+                            Keyed_with(node, keyword, timestamp=part.updated)
 
     def split_keywords(self, text):
         r'''Parse a string contining zero or more keywords and iterate over the
@@ -926,7 +928,7 @@ class In_model(Link):
         return self.node.only_place()
 
 @link_predicate
-def is_principal(node, link):
+def is_principal(link):
     r'''A Model.nodes() and Model.links() predicate that selects only links
     that are principal links in the model.
     '''

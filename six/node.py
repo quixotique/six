@@ -10,9 +10,10 @@ from six.multilang import *
 
 __all__ = [
         'Node', 'Link', 'NamedNode',
-        'incoming', 'outgoing', 'is_link', 'is_link_only',
+        'incoming', 'outgoing', 'is_other', 'is_link',
+        'instance_p', 'type_p',
         'from_node', 'to_node',
-        'has_place', 'in_place', 'test_link', 'test_link_attr',
+        'only_in_place', 'in_place', 'test_attr',
         'name_imatches',
     ]
 
@@ -75,9 +76,10 @@ class Node(object):
                 break
         return place
 
-    def links(self, pred=lambda n, l: True):
-        r'''Iterate over all the links for this node that satisfy the given
-        predicate.
+    def links(self, pred=None):
+        r'''Iterate over all the links attached to this node that satisfy the
+        given selection predicate, link predicate, or whose node at the other
+        end of the link satisfies the given node predicate.
 
             >>> class A(Node): pass
             >>> class B(A): pass
@@ -93,14 +95,18 @@ class Node(object):
             >>> lab = Link(a, b)
             >>> set(n.links()) == set([lna, lnb, lnc, lan])
             True
-            >>> set(n.links(to_node(A))) == set([lna, lnb])
+            >>> set(n.links(to_node(instance_p(A)))) == set([lna, lnb])
             True
-            >>> set(n.links(to_node(A) & to_node(B))) == set([lnb])
+            >>> set(n.links(to_node(instance_p(A)) & to_node(instance_p(B)))) == set([lnb])
             True
-            >>> set(n.links(to_node(A) & to_node(C))) == set([])
+            >>> set(n.links(to_node(instance_p(A)) & to_node(instance_p(C)))) == set([])
             True
 
         '''
+        if pred is None:
+            pred = selection_predicate(lambda n, l: True)
+        else:
+            pred = selection_predicate.cast(pred)
         for link in self._links:
             if pred(self, link):
                 yield link
@@ -122,12 +128,12 @@ class Node(object):
             >>> lnb = Link(n, b)
             >>> lnc = Link(n, c)
             >>> lab = Link(a, b)
-            >>> n.link(to_node(A))
+            >>> n.link(to_node(instance_p(A)))
             Traceback (most recent call last):
             AssertionError
-            >>> n.link(to_node(A) & to_node(B)) is lnb
+            >>> n.link(to_node(instance_p(A)) & to_node(instance_p(B))) is lnb
             True
-            >>> n.link(to_node(A) & to_node(C)) is None
+            >>> n.link(to_node(instance_p(A)) & to_node(instance_p(C))) is None
             True
 
         '''
@@ -135,9 +141,10 @@ class Node(object):
         assert len(links) <= 1
         return links[0] if len(links) else None
 
-    def nodes(self, pred=lambda n, l: True):
-        r'''Iterate over all the nodes linked to this node that satisfy the
-        given predicates.
+    def nodes(self, pred=None):
+        r'''Iterate over all the nodes linked to this node which satisfy the
+        given node predicate, or which are connected by a link which satisfies
+        the given selection predicate or link predicate.
 
             >>> class A(Node): pass
             >>> class B(A): pass
@@ -148,9 +155,9 @@ class Node(object):
             >>> lb = Link(n, b)
             >>> set(n.nodes()) == set([a, b])
             True
-            >>> set(n.nodes(to_node(A))) == set([a, b])
+            >>> set(n.nodes(to_node(instance_p(A)))) == set([a, b])
             True
-            >>> set(n.nodes(to_node(B))) == set([b])
+            >>> set(n.nodes(to_node(instance_p(B)))) == set([b])
             True
 
         '''
@@ -170,12 +177,12 @@ class Node(object):
             >>> n = Node()
             >>> la = Link(n, a)
             >>> lb = Link(n, b)
-            >>> n.node(to_node(A))
+            >>> n.node(to_node(instance_p(A)))
             Traceback (most recent call last):
             AssertionError
-            >>> n.node(to_node(B)) is b
+            >>> n.node(to_node(instance_p(B))) is b
             True
-            >>> n.node(to_node(C)) is None
+            >>> n.node(to_node(instance_p(C))) is None
             True
 
         '''
@@ -183,14 +190,13 @@ class Node(object):
         assert len(nodes) <= 1
         return nodes[0] if len(nodes) else None
 
-    def find_nodes(self, traverse, select=lambda node: True,
-                                   stop=lambda node: False):
+    def find_nodes(self, traverse, select=None, stop=None):
         r'''
-        @param traverse: predicate that selects the links to follow from each
-            node
-        @param select: a predicate that selects the nodes to return
-        @param stop: a predicate that selects the links not to follow from each
-            node, overrides 'traverse'
+        @param traverse: selection predicate that selects the links to follow
+            from each node
+        @param select: node predicate that selects the nodes to return
+        @param stop: link predicate that selects the links not to follow from
+            each node, overrides 'traverse'
         @return: iterator over (link, node, link, node, ...) tuples, where the
             last element is the found link or node, and the preceding elements
             are all the links and nodes that were traversed to reach it
@@ -202,10 +208,11 @@ class Node(object):
             node = nodes[-1]
             for link in node.links(traverse):
                 for visit in (link,), (link, link.other(node)):
-                    if not stop(visit[-1]) and id(visit[-1]) not in visited:
+                    if ((stop is None or not stop(visit[-1])) and
+                        id(visit[-1]) not in visited):
                         visited.add(id(visit[-1]))
                         todo.append(nodes + visit)
-                        if select(todo[-1][-1]):
+                        if select is None or select(todo[-1][-1]):
                             yield todo[-1][1:]
 
 class Link(Node):
@@ -250,38 +257,132 @@ class Link(Node):
             assert node is self.node2
             return self.node1
 
-class link_predicate(object):
+class node_predicate(object):
 
-    r'''A predicate function wrapper that allows predicates to be combined
-    using logical operators '&' and '|' and '~' (in place of 'and', 'or',
-    'not', which cannot be overloaded in Python).
+    r'''A node predicate N is a callable N(Node) which returns True if the node
+    satisfies the criteria of the predicate.
+
+    The 'node_predicate' class is a wrapper that allows node predicates to be
+    combined using logical operators '&' and '|' and '~' (which ideally should
+    be 'and', 'or', 'not', but those operators cannot be overloaded in Python).
     '''
 
     def __init__(self, func):
         self._func = func
 
+    def __call__(self, node):
+        assert isinstance(node, Node), '%r is not a Node' % node
+        return self._func(node)
+
+    def __and__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return type(self)(lambda node: self._func(node) and
+                                           other._func(node))
+
+    def __or__(self, other):
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return type(self)(lambda node: self._func(node) or
+                                           other._func(node))
+
+    def __invert__(self):
+        return type(self)(lambda node: not self._func(node))
+
+class link_predicate(node_predicate):
+
+    r'''A link predicate is a specialisation of a node predicate which only
+    accepts Link objects.  A link predicate L is a callable L(Link) which
+    returns True if the link satisfies the criteria of the predicate.
+
+    The 'link_predicate' class is a wrapper that allows link predicates to be
+    combined using logical operators '&' and '|' and '~' (which ideally should
+    be 'and', 'or', 'not', but those operators cannot be overloaded in Python).
+    '''
+
+    def __call__(self, link):
+        assert isinstance(link, Node), '%r is not a Link' % link
+        return self._func(link)
+
+class selection_predicate(object):
+
+    r'''A selection predicate S is a callable S(Node, Link) which is invoked in
+    the context of an origin node O, for example by O.links(S) or O.nodes(S).
+    The first argument passed to the selection predicate is the origin node, O,
+    and the second argument L is the Link node in question.  The the node at
+    the other end of O can be found using "L.other(O)".
+    
+    The 'selection_predicate' class is a wrapper that allows selection
+    predicates to be combined using logical operators '&' and '|' and '~'
+    (which ideally should be 'and', 'or', 'not', but those operators cannot be
+    overloaded in Python).
+    '''
+
+    def __init__(self, func):
+        self._func = func
+
+    @classmethod
+    def cast(cls, pred):
+        r'''If a node predicate is given where a selection predicate is needed,
+        then it is converted to a selection predicate that applies the node
+        predicate to the node at the other end of the link, not to the
+        originating node.  If a link predicate is given where a selection
+        predicate is needed, then it is converted to a selection predicate that
+        applies the link predicate to the link.
+        '''
+        if isinstance(pred, link_predicate):
+            pred = is_link(pred)
+        elif isinstance(pred, node_predicate):
+            pred = is_other(pred)
+        if not isinstance(pred, selection_predicate):
+            raise NotImplementedError
+        return pred
+
     def __call__(self, node, link):
+        assert isinstance(node, Node), '%r is not a Node' % node
+        assert isinstance(link, Node), '%r is not a Link' % link
         return self._func(node, link)
 
     def __and__(self, other):
-        if not isinstance(other, link_predicate):
+        try:
+            other = self.cast(other)
+        except NotImplementedError:
             return NotImplemented
-        return link_predicate(lambda node, link: self._func(node, link) and
-                                        other._func(node, link))
+        return selection_predicate(lambda node, link:
+                            self._func(node, link) and other._func(node, link))
+
+    def __rand__(self, other):
+        try:
+            other = self.cast(other)
+        except NotImplementedError:
+            return NotImplemented
+        return selection_predicate(lambda node, link:
+                            other._func(node, link) and self._func(node, link))
 
     def __or__(self, other):
-        if not isinstance(other, link_predicate):
+        try:
+            other = self.cast(other)
+        except NotImplementedError:
             return NotImplemented
-        return link_predicate(lambda node, link: self._func(node, link) or
-                                        other._func(node, link))
+        return selection_predicate(lambda node, link:
+                            self._func(node, link) or other._func(node, link))
+
+    def __ror__(self, other):
+        try:
+            other = self.cast(other)
+        except NotImplementedError:
+            return NotImplemented
+        return selection_predicate(lambda node, link:
+                            other._func(node, link) or self._func(node, link))
 
     def __invert__(self):
-        return link_predicate(lambda node, link: not self._func(node, link))
+        return selection_predicate(lambda node, link:
+                            not self._func(node, link))
 
-@link_predicate
+@selection_predicate
 def outgoing(node, link):
-    r'''Node.nodes() and Node.links() predicate that selects only links that
-    point from the queried node.
+    r'''A selection predicate that selects only links that point outward from
+    the orginal node (ie, whose 'node1' attribute is the origin node).
 
         >>> class A(Link): pass
         >>> class B(A): pass
@@ -307,10 +408,10 @@ def outgoing(node, link):
     '''
     return node is link.node1
 
-@link_predicate
+@selection_predicate
 def incoming(node, link):
-    r'''Node.nodes() and Node.links() predicate that selects only links that
-    point to the queried node.
+    r'''A selection predicate that selects only links that point inward to the
+    orginal node (ie, whose 'node2' attribute is the origin node).
 
         >>> class A(Link): pass
         >>> class B(A): pass
@@ -336,8 +437,17 @@ def incoming(node, link):
     '''
     return node is link.node2
 
-def is_link(typ):
-    r'''Return a predicate that matches links of the given type.
+def is_other(pred):
+    r'''Return a selection predicate that applies the given node predicate to
+    the node at the other end of the link.
+    '''
+    assert isinstance(pred, node_predicate)
+    return selection_predicate(lambda node, link: pred(link.other(node)))
+
+def is_link(pred):
+    r'''Return a link predicate that applies the given link predicate to the
+    link.  As a convenience, if L is a subclass of Link, then is_link(L) means
+    is_link(instance_p(L)).
 
         >>> class A(Link): pass
         >>> class B(A): pass
@@ -369,11 +479,23 @@ def is_link(typ):
         True
 
     '''
-    return link_predicate(lambda node, link: isinstance(link, typ))
+    if type(pred) is type and issubclass(pred, Link):
+        pred = instance_p(pred)
+    return selection_predicate(lambda node, link: pred(link))
 
-def is_link_only(typ):
-    r'''Return a predicate that matches links of the given type but not
-    subtypes thereof.
+def instance_p(typ):
+    r'''Return a node predicate that returns True if the given Node object is
+    an instance of the given type or subclass thereof.
+    '''
+    if issubclass(typ, Link):
+        return link_predicate(lambda link: isinstance(link, typ))
+    if issubclass(typ, Node):
+        return node_predicate(lambda node: isinstance(node, typ))
+    raise ValueError('instance_p(%r): invalid argument' % typ)
+
+def type_p(typ):
+    r'''Return a node predicate that returns True if the given Node object is
+    an instance of the given type, but not any subclass thereof.
 
         >>> class A(Link): pass
         >>> class B(A): pass
@@ -389,28 +511,35 @@ def is_link_only(typ):
         >>> b21 = B(n2, n1)
         >>> c12 = C(n1, n2)
         >>> c21 = C(n2, n1)
-        >>> set(n1.links(is_link_only(A))) == set([a12, a31])
+        >>> set(n1.links(is_link(type_p(A)))) == set([a12, a31])
         True
-        >>> set(n1.links(~is_link_only(A))) == set([b13, b21, c12, c21])
+        >>> set(n1.links(~is_link(type_p(A)))) == set([b13, b21, c12, c21])
         True
-        >>> set(n1.links(is_link_only(A) & outgoing)) == set([a12])
+        >>> set(n1.links(is_link(type_p(A)) & outgoing)) == set([a12])
         True
-        >>> set(n1.links(is_link_only(B))) == set([b21, b13])
+        >>> set(n1.links(is_link(type_p(B)))) == set([b21, b13])
         True
-        >>> set(n1.links(is_link_only(C))) == set([c12, c21])
+        >>> set(n1.links(is_link(type_p(C)))) == set([c12, c21])
         True
-        >>> set(n1.links(is_link_only(C) | is_link_only(B))) == set([b21, b13, c12, c21])
+        >>> set(n1.links(is_link(type_p(C)) | is_link(type_p(B)))) == set([b21, b13, c12, c21])
         True
-        >>> set(n1.links(outgoing & (is_link_only(C) | is_link_only(B)))) == set([b13, c12])
+        >>> set(n1.links(outgoing & (is_link(type_p(C)) | is_link(type_p(B))))) == set([b13, c12])
         True
 
     '''
-    return link_predicate(lambda node, link: type(link) is typ)
+    if issubclass(typ, Link):
+        return link_predicate(lambda link: type(link) is typ)
+    if issubclass(typ, Node):
+        return node_predicate(lambda node: type(node) is typ)
+    raise ValueError('type_p(%r): invalid argument' % typ)
 
 def from_node(node):
-    r'''Return a predicate that selects links from the given node, or from a
-    class of nodes.
-
+    r'''If 'node' is a Node object, return a link predicate that selects links
+    that originate from (ie whose 'node1' attribute is) the given node.  If
+    'node' is a node predicate, then return a link predicate that selects links
+    that originate (ie whose 'node1' attribute is) from nodes that satisfy the
+    given predicate.
+    
         >>> class A(Node): pass
         >>> class B(A): pass
         >>> class C(Node): pass
@@ -429,25 +558,28 @@ def from_node(node):
         True
         >>> set(a.links(from_node(c))) == set([ca])
         True
-        >>> set(a.links(from_node(A))) == set([ab, ba, ac])
+        >>> set(a.links(from_node(instance_p(A)))) == set([ab, ba, ac])
         True
-        >>> set(b.links(from_node(A))) == set([ab, ba, bc])
+        >>> set(b.links(from_node(instance_p(A)))) == set([ab, ba, bc])
         True
-        >>> set(c.links(from_node(A))) == set([ac, bc])
+        >>> set(c.links(from_node(instance_p(A)))) == set([ac, bc])
         True
-        >>> set(c.links(from_node(B))) == set([bc])
+        >>> set(c.links(from_node(instance_p(B)))) == set([bc])
         True
 
     '''
-    if type(node) is type:
-        assert issubclass(node, Node)
-        return link_predicate(lambda node0, link: isinstance(link.node1, node))
-    assert isinstance(node, Node)
-    return link_predicate(lambda node0, link: link.node1 is node)
+    if isinstance(node, Node):
+        return link_predicate(lambda link: link.node1 is node)
+    if isinstance(node, node_predicate):
+        return link_predicate(lambda link: node(link.node1))
+    raise ValueError('from_node(%r): invalid argument' % node)
 
 def to_node(node):
-    r'''Return a predicate that selects links to the given node, or to a class
-    of nodes.
+    r'''If 'node' is a Node object, return a link predicate that selects Links
+    that point to (ie whose 'node2' attribute is) the given node.  If 'node' is
+    a node predicate, then return a link predicate that selects links that
+    point to (ie whose 'node2' attribute is) from nodes that satisfy the given
+    predicate.
 
         >>> class A(Node): pass
         >>> class B(A): pass
@@ -467,32 +599,31 @@ def to_node(node):
         True
         >>> set(c.links(to_node(a))) == set([ca])
         True
-        >>> set(a.links(to_node(A))) == set([ab, ba, ca])
+        >>> set(a.links(to_node(instance_p(A)))) == set([ab, ba, ca])
         True
-        >>> set(a.links(to_node(B))) == set([ab])
+        >>> set(a.links(to_node(instance_p(B)))) == set([ab])
         True
-        >>> set(a.links(to_node(C))) == set([ac])
+        >>> set(a.links(to_node(instance_p(C)))) == set([ac])
         True
 
     '''
-    if type(node) is type:
-        assert issubclass(node, Node)
-        return link_predicate(lambda node0, link: isinstance(link.node2, node))
-    assert isinstance(node, Node)
-    return link_predicate(lambda node0, link: link.node2 is node)
+    if isinstance(node, Node):
+        return link_predicate(lambda link: link.node2 is node)
+    if isinstance(node, node_predicate):
+        return link_predicate(lambda link: node(link.node2))
+    raise ValueError('to_node(%r): invalid argument' % node)
 
-def has_place(place):
-    r'''Return a predicate that selects links with the given only place.
+def only_in_place(place):
+    r'''Return a node predicate that selects nodes with the given only place.
     '''
-    return link_predicate(lambda node, link: link.only_place() == place)
+    return node_predicate(lambda node: node.only_place() == place)
 
 def in_place(place):
-    r'''Return a predicate that selects links that are in a given place.
+    r'''Return a node predicate that selects nodes that are in a given place.
     '''
-    @link_predicate
-    def test_is_in(node, link):
-        other = link.other(node)
-        for p in other.all_places():
+    @node_predicate
+    def test_is_in(node):
+        for p in node.all_places():
             if place.area is not None:
                 if p.area == place.area:
                     return True
@@ -501,17 +632,11 @@ def in_place(place):
         return False
     return test_is_in
 
-def test_link(func):
-    r'''Return a predicate that selects links which satisfy a given function
-    that takes the link as its single argument.
+def test_attr(name):
+    r'''Return a node predicate that selects nodes with a given named attribute
+    whose value is true.
     '''
-    return link_predicate(lambda node, link: func(link))
-
-def test_link_attr(name):
-    r'''Return a predicate that selects links with a given named attribute with
-    a given value.
-    '''
-    return test_link(lambda link: getattr(link, name, False))
+    return node_predicate(lambda node: bool(getattr(node, name, False)))
 
 class NamedNode(Node):
 
@@ -565,19 +690,19 @@ class NamedNode(Node):
         return str(unicode(self))
 
 def name_imatches(text):
-    r'''Return a predicate that selects links to named nodes whose name(s)
-    contains an inner match for the given text.
+    r'''Return a node predicate that selects named nodes whose name(s) contains
+    an inner match for the given text.
     '''
     itext = text_match_key(text)
-    def _match(node, link):
-        oth = link.other(node)
-        if not isinstance(oth, NamedNode):
+    @node_predicate
+    def _match(node):
+        if not isinstance(node, NamedNode):
             return False
-        for name in oth.names():
+        for name in node.names():
             if hasattr(name, 'imatches') and callable(name.imatches):
                 if name.imatches(itext):
                     return True
             elif itext in text_match_key(name):
                 return True
         return False
-    return link_predicate(_match)
+    return _match

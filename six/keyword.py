@@ -81,19 +81,20 @@ class Keyword(Node):
 class Keyed_with(Link):
 
     def __init__(self, who, keyword, timestamp=None):
-        assert isinstance(who, (Person, Family, Organisation))
+        assert isinstance(who, (Person, Family, Organisation, Works_at)), \
+                'cannot attach Keyword to %r' % who
         assert isinstance(keyword, Keyword)
         super(Keyed_with, self).__init__(who, keyword, timestamp=timestamp)
         self.who = who
         self.keyword = keyword
 
-from six.node import link_predicate
+from six.node import node_predicate
 
 def keyed_with(keyword):
     r'''Return a predicate that returns true if the node at the other end of
     the link linked to the given keyword node.
     '''
-    def _pred(node, link):
-        oth = link.other(node)
-        return bool(oth.link(outgoing & is_link(Keyed_with) & to_node(keyword)))
-    return link_predicate(_pred)
+    def _pred(node):
+        return bool(node.link(outgoing & is_link(Keyed_with) &
+                              to_node(keyword)))
+    return node_predicate(_pred)

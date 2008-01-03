@@ -101,7 +101,7 @@ class Department(Organisation):
         exactly one parent company.
         '''
         com = list(self.find_nodes(incoming & is_link(Has_department),
-                                   select=lambda n: isinstance(n, Company)))
+                                   select=instance_p(Company)))
         assert len(com) == 1
         return com[0][-1]
 

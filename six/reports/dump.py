@@ -26,11 +26,13 @@ def report_dump(options, model, predicate, local, encoding):
     # If no predicate given, then select all people, organisations, and
     # families.
     if predicate is None:
-        predicate = from_node(Person) | from_node(Company) | from_node(Family)
+        predicate = (instance_p(Person) |
+                     instance_p(Company) |
+                     instance_p(Family))
     # Populate the top level of the report with all the nodes that satisfy the
     # predicate.
     itemiser = Itemiser()
-    itemiser.update(model.nodes(predicate))
+    itemiser.update(model.nodes(is_other(predicate)))
     # Add nodes that are implied by the predicate:
     # - A selected person implies the family they belong to.
     for node in list(itemiser):

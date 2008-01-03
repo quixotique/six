@@ -28,11 +28,13 @@ def report_book(options, model, predicate, local, encoding):
     # If no predicate given, then select all people, organisations, and
     # families.
     if predicate is None:
-        predicate = from_node(Person) | from_node(Company) | from_node(Family)
+        predicate = (instance_p(Person) |
+                     instance_p(Company) |
+                     instance_p(Family))
     # Populate the top level of the report with all the nodes that satisfy the
     # predicate.
     itemiser = Itemiser()
-    itemiser.update(model.nodes(predicate))
+    itemiser.update(model.nodes(is_other(predicate)))
     # Top level references.  A dictionary that maps top level node to the node
     # in whose entry it appears.
     refs = dict()
@@ -76,7 +78,7 @@ def report_book(options, model, predicate, local, encoding):
     # Remove unnecessary references.
     cull_references(toplevel)
     # Format the report.
-    booklet = Booklet(refs=refs, local=local)
+    booklet = Booklet(predicate=predicate, refs=refs, local=local)
     for item in toplevel:
         if item.node is not None:
             booklet.add_entry(item)
@@ -155,7 +157,8 @@ class Booklet(object):
     designed to be cut to size and bound in a filofax.
     '''
 
-    def __init__(self, refs, local):
+    def __init__(self, predicate, refs, local):
+        self.predicate = predicate
         self.refs = refs
         self.local = local
         self.section = 0
@@ -490,7 +493,8 @@ class Booklet(object):
             if link.position:
                 self._is_not_empty()
                 position = ', ' + escape_xml(unicode(link.position))
-            if top is com or (top is None and link.is_head):
+            if top is com or (top is None and (link.is_head or
+                                               self.predicate(link))):
                 self._is_not_empty()
                 # Special case: if the person has no top level entry but
                 # belongs to a family that does, then list a reference to that

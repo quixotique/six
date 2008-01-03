@@ -14,7 +14,8 @@ from six.reports.dump import dump_comments, telephones, qual_home, qual_work
 
 def report_phone(options, model, predicate, local, encoding):
     if predicate is None:
-        predicate = ((from_node(Person) | from_node(Company)) & is_principal)
+        predicate = is_principal & is_other(instance_p(Person) |
+                                            instance_p(Company))
     tkw = {'fax': False, 'bold': True}
     itemiser = Itemiser()
     itemiser.update(model.nodes(predicate))

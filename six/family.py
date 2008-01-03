@@ -80,7 +80,7 @@ class Family(NamedNode):
     def heads(self):
         from six.links import Belongs_to
         for link in sorted(self.links(incoming & is_link(Belongs_to) &
-                                      test_link_attr('is_head')),
+                                      is_link(test_attr('is_head'))),
                            key=lambda l: (not l.person.full_name_known(),
                                           l.sequence or 0,
                                           l.person.sortkey())):
@@ -89,7 +89,7 @@ class Family(NamedNode):
     def tails(self):
         from six.links import Belongs_to
         for link in sorted(self.links(incoming & is_link(Belongs_to) &
-                                      ~test_link_attr('is_head'))):
+                                      ~is_link(test_attr('is_head')))):
             yield link.person
 
     @uniq_generator

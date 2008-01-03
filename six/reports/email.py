@@ -13,10 +13,12 @@ from six.email import *
 
 def report_email(options, model, predicate, local, encoding):
     if predicate is None:
-        predicate = from_node(Person) | from_node(Company) | from_node(Family)
+        predicate = (instance_p(Person) |
+                     instance_p(Company) |
+                     instance_p(Family))
         options.all = False
     itemiser = Itemiser()
-    itemiser.update(model.nodes(predicate))
+    itemiser.update(model.nodes(is_other(predicate)))
     # Remove entries for families for which one or more of the heads was found.
     for person in filter(lambda node: isinstance(node, Person), itemiser):
         for belongs_to in person.links(outgoing & is_link(Belongs_to)):
@@ -33,20 +35,20 @@ def report_email(options, model, predicate, local, encoding):
                     (outgoing & is_link(Belongs_to)) |
                     (outgoing & is_link(Resides_at)))
             if not options.all:
-                stop = lambda node: isinstance(node, Person)
+                stop = instance_p(Person)
         elif isinstance(node, Family):
             pred = ((outgoing & is_link(Works_at)) |
                     (incoming & is_link(Belongs_to)) |
                     (outgoing & is_link(Resides_at)))
             if not options.all:
-                stop = lambda node: isinstance(node, Organisation)
+                stop = instance_p(Organisation)
         else:
             assert isinstance(node, Person)
             pred = ((outgoing & is_link(Belongs_to)) |
                     (outgoing & is_link(Resides_at)) |
                     (outgoing & is_link(Works_at)))
             if not options.all:
-                stop = lambda node: isinstance(node, Organisation)
+                stop = instance_p(Organisation)
         for tup in sorted(node.find_nodes(pred, stop=stop), key=len):
             print_emails(tup[-1], encoding)
 

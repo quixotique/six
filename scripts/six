@@ -119,7 +119,7 @@ def main():
                         place = model.lookup_place(arg[3:])
                     except LookupError, e:
                         raise ArgError(e, arg=arg[3:])
-                    p = from_node(NamedNode) & in_place(place)
+                    p = instance_p(NamedNode) & in_place(place)
                 else:
                     p = name_imatches(arg.decode(enc))
                 if pred is None:
