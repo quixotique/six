@@ -179,7 +179,8 @@ class Booklet(object):
                     topMargin=0, bottomMargin=0,
                 )
         self.flowables = []
-        self._stack = []
+        self._keeptogether_stack = []
+        self._notempty_stack = []
 
     def write_pdf_to(self, path):
         r'''Generate the PDF for the booklet, writing it to a file with the
@@ -202,6 +203,7 @@ class Booklet(object):
         self.entry = []
         self.indent = 0
         self._empty_flag = True
+        self.start_keep_together()
         if item is not item.single:
             self.add_names([item.key], refname=item.single.key, bold=False)
             rulegap = 4
@@ -217,34 +219,51 @@ class Booklet(object):
                 assert False, repr(item.node)
             rulegap = 2
         self.entry.append(Rule(height=.5, spaceBefore=rulegap, spaceAfter=1))
-        self.flowables.append(KeepTogether(self.entry))
+        self.end_keep_together()
+        self.flowables.extend(self.entry)
+
+    def start_keep_together(self):
+        r'''Start a KeepTogether sequence of flowables, which will be
+        terminated by at the matching call to self.end_keep_together().
+        '''
+        self._keeptogether_stack.append(self.entry)
+        self.entry = []
+
+    def end_keep_together(self):
+        r'''End a KeepTogether sequence of flowables which was started with its
+        matching call to self.start_keep_together().
+        '''
+        keep = self.entry
+        self.entry = self._keeptogether_stack.pop()
+        if keep:
+            self.entry.append(KeepTogether(keep, maxHeight= 4 * cm))
 
     def test_is_empty(self, func):
         r'''Return true if invoking the given callable would produce any
         important content, such as comments, birthday, contacts or addresses.
         '''
-        self._stack.append((self.entry, self.indent, self._empty_flag))
+        self._notempty_stack.append((self.entry, self.indent, self._empty_flag))
         self.entry = []
         self._empty_flag = True
         func()
         ret = self._empty_flag
-        self.entry, self.indent, self._empty_flag = self._stack.pop()
+        self.entry, self.indent, self._empty_flag = self._notempty_stack.pop()
         return ret
 
     def if_not_empty(self, func):
         r'''Append content to the current entry by calling func(), but if func
         tests as empty, then do not append anything.
         '''
-        self._stack.append((self.entry, self.indent, self._empty_flag))
+        self._notempty_stack.append((self.entry, self.indent, self._empty_flag))
         self.entry = []
         self._empty_flag = True
         func()
         if not self._empty_flag:
-            top = self._stack.pop()
+            top = self._notempty_stack.pop()
             self.entry = top[0] + self.entry
             self._empty_flag = top[2]
             return True
-        self.entry, self.indent, self._empty_flag = self._stack.pop()
+        self.entry, self.indent, self._empty_flag = self._notempty_stack.pop()
         return False
 
     def _is_not_empty(self):
@@ -381,6 +400,7 @@ class Booklet(object):
                                key=lambda l: (not l.is_head,
                                               l.sequence or 0,
                                               l.person.sortkey())):
+                self.start_keep_together()
                 # If this member has no top level entry, or has a top level
                 # reference to this family, then list the member here.
                 # Otherwise, just list a reference to the entry where the
@@ -421,6 +441,7 @@ class Booklet(object):
                     self.add_names([top.sort_keys().next()],
                                    bullet=RIGHT_ARROW, bold=False)
                     self.indent -= 2
+                self.end_keep_together()
             # Omitted family members who are not heads will not be mentioned
             # anywhere unless we list them here.
             plus = [link.person for link in omitted if not link.is_head]
@@ -439,6 +460,7 @@ class Booklet(object):
         parent = None
         if show_parents:
             if isinstance(org, Department):
+                self.start_keep_together()
                 # If the parent organisation has a top level entry, then refer
                 # to it.  Otherwise, we list it below.
                 parent = org.link(incoming & is_link(Has_department))
@@ -448,6 +470,7 @@ class Booklet(object):
                                    bullet=RIGHT_ARROW, bold=False,
                                    comments=self.all_comments(parent))
                     parent = None
+                self.end_keep_together()
         self.add_addresses(org)
         self.add_contacts(org, link)
         if parent:
@@ -462,6 +485,7 @@ class Booklet(object):
             self.add_works_at(org)
         if show_departments:
             for link in org.links(outgoing & is_link(Has_department)):
+                self.start_keep_together()
                 # Departments' top level entries are always references to their
                 # parent company's top level entry.  So we list departments
                 # here in full -- no references.  Only departments with top
@@ -481,9 +505,11 @@ class Booklet(object):
                     self.add_organisation(link.dept, link,
                                           show_workers=show_workers)
                     self.indent -= 1
+                self.end_keep_together()
 
     def add_works_at(self, org):
         for link in sorted(org.links(incoming & is_link(Works_at))):
+            self.start_keep_together()
             # If the person has a top level reference to the company entry in
             # which this organisation appears, or has no top level entry but is
             # a principal of the company, then list the person here.
@@ -535,6 +561,7 @@ class Booklet(object):
                     self.indent += 2
                     self.add_contacts(link, context=At_work)
                     self.indent -= 2
+            self.end_keep_together()
 
     def all_comments(self, *nodes):
         for node in nodes:
@@ -692,10 +719,15 @@ class Rule(Flowable):
         self.canv.line(0, y, self.width, y)
         self.canv.restoreState()
 
-# Fix a bug in KeepTogether -- it merges adjacent space when calculating the
-# height, which it shouldn't.
+# Fix bugs in KeepTogether -- it merges adjacent space when calculating the
+# height, which it shouldn't, and NullActionFlowable.apply() is missing the
+# 'doc' arg, so it raises a TypeError in BaseDocTemplate.build().
+
 import reportlab.platypus.flowables as _pf
+import reportlab.platypus.doctemplate as _dt
+
 class KeepTogether(_pf.KeepTogether):
+
     def wrap(self, aW, aH):
         dims = []
         W,H = _pf._listWrapOn(self._content,aW,self.canv,mergeSpace=0,dims=dims)
@@ -703,3 +735,20 @@ class KeepTogether(_pf.KeepTogether):
         self._H0 = dims and dims[0][1] or 0
         self._wrapInfo = aW,aH
         return W, 0xffffff  # force a split
+
+    def split(self, aW, aH):
+        if getattr(self,'_wrapInfo',None)!=(aW,aH): self.wrap(aW,aH)
+        S = self._content[:]
+        C0 = self._H > aH and self._maxHeight and aH < self._maxHeight
+        C1 = self._H0 > aH
+        if C0 or C1:
+            if C0:
+                A = _dt.FrameBreak
+            else:
+                A = NullActionFlowable
+            S.insert(0,A())
+        return S
+
+class NullActionFlowable(_dt.NullActionFlowable):
+    def apply(self, doc):
+        pass
