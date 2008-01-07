@@ -23,14 +23,27 @@ from six.model import Model, ModelParser
 from six.node import name_imatches, NamedNode, in_place
 from six.links import from_node
 from six.keyword import keyed_with
-from six.reports.dump import report_dump
-from six.reports.book import report_book
-from six.reports.email import report_email
-from six.reports.phone import report_phone
+from six.reports.dump import report_dump, report_dump_getopt
+from six.reports.book import report_book, report_book_getopt
+from six.reports.email import report_email, report_email_getopt
+from six.reports.phone import report_phone, report_phone_getopt
 
 def main():
     locale.setlocale(locale.LC_ALL, '')
     lang, enc = locale.getlocale()
+    reports = dict([(name[7:], (obj, globals().get(name + '_getopt')))
+                            for name, obj in globals().iteritems()
+                            if callable(obj) and name.startswith('report_')])
+    assert reports
+    assert 'dump' in reports
+    def select_report(option, optstr, value, parser):
+        r'''When the --report option is parsed, call the report's getopt
+        function, which may populate the option parser with more options.
+        '''
+        parser.values.report = value
+        getopt_func = reports[value][1]
+        if getopt_func:
+            getopt_func(parser)
     op = OptionParser(usage=
         'Usage: %prog --doctest [doctest-options] [module ...]\n'
         '       %prog [options] [expr]')
@@ -41,18 +54,13 @@ def main():
                   help='output addresses and telephone numbers relative to '
                        'the country or area named LOCAL')
     op.add_option('-r', '--report',
-                  action='store', type='string', dest='report',
-                  help='select output report, REPORT is one of: dump, phone')
+                  action='callback', type='choice', callback=select_report,
+                  choices=sorted(reports),
+                  help='select output report')
     op.add_option('-o', '--output',
                   action='store', type='string', dest='output_path',
                   help='write output to file pathname instead of stdout')
-    op.add_option('-a', '--all',
-                  action='store_true', dest='all',
-                  help='print all possible values')
-    op.add_option('-e', '--encode',
-                  action='store', dest='string', dest='encoding',
-                  help='use ENCODE as output encoding')
-    op.set_defaults(report='dump')
+    op.set_defaults(report='dump', encoding=enc)
     options, args = op.parse_args()
     path = os.path.join(os.environ['HOME'], 'me', 'contacts', 'nlist')
     cache = os.path.join(os.path.dirname(path),
@@ -127,16 +135,12 @@ def main():
                 else:
                     pred = pred & p
         # Print the selected report.
-        try:
-            report = globals()['report_' + options.report]
-        except KeyError:
-            raise ArgError('unsupported report %r' % options.report)
-        report(options, model, pred, local, options.encoding or enc)
+        reports[options.report][0](options, model, pred, local)
     except InputError, e:
         print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]), str(e))
         sys.exit(2)
 
-def opt_doctest(option, opt_str, value, parser, *args, **kwargs):
+def opt_doctest(option, opt_str, value, parser):
     op = OptionParser(usage=r'Usage: %prog --doctest [options] [module ...]')
     op.add_option('-v', '--verbose', action='store_true', dest='verbose',
                   help='print all tests and results as they are run')

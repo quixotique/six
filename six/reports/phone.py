@@ -12,7 +12,12 @@ from six.family import *
 from six.org import *
 from six.reports.dump import dump_comments, telephones, qual_home, qual_work
 
-def report_phone(options, model, predicate, local, encoding):
+def report_phone_getopt(parser):
+    parser.add_option('-e', '--encode',
+                      action='store', type='string', dest='encoding',
+                      help='use ENCODE as output encoding')
+
+def report_phone(options, model, predicate, local):
     if predicate is None:
         predicate = is_principal & is_other(instance_p(Person) |
                                             instance_p(Company))
@@ -80,7 +85,7 @@ def report_phone(options, model, predicate, local, encoding):
                 subsub = sub.sub()
                 telephones(dept, subsub, **tkw)
                 telephones_org(dept, subsub, **tkw)
-    print unicode(tree).encode(encoding, 'replace')
+    print unicode(tree).encode(options.encoding, 'replace')
 
 def telephones_org(org, tree, **tkw):
     for tup in org.find_nodes(outgoing & is_link(Resides_at)):

@@ -11,7 +11,15 @@ from six.family import *
 from six.org import *
 from six.email import *
 
-def report_email(options, model, predicate, local, encoding):
+def report_email_getopt(parser):
+    parser.add_option('-a', '--all',
+                      action='store_true', dest='all',
+                      help='print all possible values')
+    parser.add_option('-e', '--encode',
+                      action='store', type='string', dest='encoding',
+                      help='use ENCODE as output encoding')
+
+def report_email(options, model, predicate, local):
     if predicate is None:
         predicate = (instance_p(Person) |
                      instance_p(Company) |
@@ -28,7 +36,7 @@ def report_email(options, model, predicate, local, encoding):
         if item is not item.single:
             continue
         node = item.node
-        print_emails(node, encoding)
+        print_emails(node, options.encoding)
         stop = lambda node: False
         if isinstance(node, Organisation):
             pred = ((incoming & is_link(Works_at)) |
@@ -50,7 +58,7 @@ def report_email(options, model, predicate, local, encoding):
             if not options.all:
                 stop = instance_p(Organisation)
         for tup in sorted(node.find_nodes(pred, stop=stop), key=len):
-            print_emails(tup[-1], encoding)
+            print_emails(tup[-1], options.encoding)
 
 def print_emails(node, encoding):
     name = None

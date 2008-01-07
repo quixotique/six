@@ -22,7 +22,12 @@ from six.data import *
 from six.comment import *
 from six.uniq import uniq
 
-def report_dump(options, model, predicate, local, encoding):
+def report_dump_getopt(parser):
+    parser.add_option('-e', '--encode',
+                      action='store', type='string', dest='encoding',
+                      help='use ENCODE as output encoding')
+
+def report_dump(options, model, predicate, local):
     # If no predicate given, then select all people, organisations, and
     # families.
     if predicate is None:
@@ -132,7 +137,7 @@ def report_dump(options, model, predicate, local, encoding):
         ofile = file(options.output_path, 'w')
     else:
         ofile = sys.stdout
-    ofile.write(unicode(tree).encode(encoding, 'replace'))
+    ofile.write(unicode(tree).encode(options.encoding, 'replace'))
 
 def add_name(node, tree, context=None):
     if context is not None:

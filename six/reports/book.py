@@ -21,8 +21,16 @@ from six.comment import *
 from six.address import *
 from six.telephone import *
 from six.email import *
+from six.struct import struct
 
-def report_book(options, model, predicate, local, encoding):
+def report_book_getopt(parser):
+    parser.add_option('-p', '--pagesize',
+                      action='store', dest='pagesize',
+                      choices=sorted(page_sizes),
+                      help='use PAGESIZE as logical page size')
+    parser.values.pagesize = 'filofax'
+
+def report_book(options, model, predicate, local):
     if not options.output_path:
         raise InputError('missing --output option')
     # If no predicate given, then select all people, organisations, and
@@ -78,7 +86,8 @@ def report_book(options, model, predicate, local, encoding):
     # Remove unnecessary references.
     cull_references(toplevel)
     # Format the report.
-    booklet = Booklet(predicate=predicate, refs=refs, local=local)
+    booklet = Booklet(predicate=predicate, refs=refs, local=local,
+                      page_size=page_sizes[options.pagesize])
     for item in toplevel:
         if item.node is not None:
             booklet.add_entry(item)
@@ -93,7 +102,19 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.lib.units import cm, mm
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
-page_size = (297 * mm, 210 * mm) # landscape A4
+paper_size = (210 * mm, 297 * mm) # landscape A4
+paper_margins = (7.5 * mm, 7.5 * mm)
+
+page_sizes = {
+    'filofax':      struct(size=        (9.4 * cm, 17.1 * cm),
+                           margin_left= 1 * cm),
+    'agenda-juana': struct(size=       (7.6 * cm, 13.6 * cm),
+                           margin_left= 7 * mm),
+}
+
+def rotated(xy):
+    return xy[1], xy[0]
+
 styles = getSampleStyleSheet()
 
 name_style = ParagraphStyle(name='Name',
@@ -157,23 +178,53 @@ class Booklet(object):
     designed to be cut to size and bound in a filofax.
     '''
 
-    def __init__(self, predicate, refs, local):
+    gutter = 0
+
+    def __init__(self, predicate, refs, local, page_size):
         self.predicate = predicate
         self.refs = refs
         self.local = local
+        self.page_size = page_size
         self.section = 0
-        self.page = PageTemplate(
-                frames=[CutFrame(x1=x1, y1=1.8*cm, width=9.4*cm, height=17.1*cm,
-                                 leftPadding=14*mm, rightPadding=2*mm,
-                                 topPadding=3*mm, bottomPadding=3*mm,
-                                 showBoundary=True)
-                        for x1 in 8*mm, 10.2*cm, 19.6*cm])
+        best_paper_size = best_paper_margins = None
+        best_n = 0
+        best_np = None
+        for psize, pmarg in [(paper_size, paper_margins),
+                             (rotated(paper_size), rotated(paper_margins))]:
+            np = [None, None]
+            for i in 0, 1:
+                np[i] = int((psize[i] - pmarg[i] * 2 + self.gutter) /
+                                (self.page_size.size[i] + self.gutter))
+            n = np[0] * np[1]
+            if n > best_n:
+                best_paper_size, best_paper_margins = psize, pmarg
+                best_n = n
+                best_np = np
+        assert best_n >= 1
+        assert best_paper_size
+        print 'best_n=%d' % best_n
+        frames = []
+        for iy in xrange(best_np[1]):
+            for ix in xrange(best_np[0]):
+                frames.append(CutFrame(
+                    x1= best_paper_margins[0] +
+                            ix * (self.page_size.size[0] + self.gutter),
+                    y1= best_paper_margins[1] +
+                            iy * (self.page_size.size[1] + self.gutter),
+                    width=  self.page_size.size[0],
+                    height= self.page_size.size[1],
+                    leftPadding=   3 * mm + self.page_size.margin_left,
+                    rightPadding=  3 * mm,
+                    topPadding=    3 * mm,
+                    bottomPadding= 3 * mm,
+                    showBoundary=  True))
+        self.page = PageTemplate(frames=frames)
         self.doc = BookletDoc(None,
                     initialSection=sections[self.section],
                     headerLeft=time.strftime(r'%-d %b %Y'),
                     headerRight=unicode(multilang(en='Page', es=u'Página')) +
                                 u' <seq id="page" />',
-                    pagesize=page_size,
+                    pagesize=best_paper_size,
                     pageTemplates=[self.page],
                     leftMargin=0, rightMargin=0,
                     topMargin=0, bottomMargin=0,
