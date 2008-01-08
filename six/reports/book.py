@@ -13,6 +13,7 @@ from six.uniq import uniq
 from six.multilang import multilang
 from six.sort import *
 from six.node import *
+from six.node import node_predicate
 from six.links import *
 from six.person import *
 from six.family import *
@@ -36,13 +37,11 @@ def report_book(options, model, predicate, local):
     # If no predicate given, then select all people, organisations, and
     # families.
     if predicate is None:
-        predicate = (instance_p(Person) |
-                     instance_p(Company) |
-                     instance_p(Family))
+        predicate = node_predicate(lambda node: True)
     # Populate the top level of the report with all the nodes that satisfy the
     # predicate.
     itemiser = Itemiser()
-    itemiser.update(model.nodes(is_other(predicate)))
+    itemiser.update(model.nodes(is_other(instance_p(NamedNode) & predicate)))
     # Top level references.  A dictionary that maps top level node to the node
     # in whose entry it appears.
     refs = dict()
@@ -272,8 +271,6 @@ class Booklet(object):
                 self.add_family(item.node)
             elif isinstance(item.node, Company):
                 self.add_organisation(item.node)
-            else:
-                assert False, repr(item.node)
             rulegap = 2
         self.entry.append(Rule(height=.5, spaceBefore=rulegap, spaceAfter=1))
         self.entry.append(ActionFlowable(('entryTitle', None)))
@@ -629,7 +626,7 @@ class Booklet(object):
     def add_comments(self, *nodes):
         for com in self.all_comments(*nodes):
             self._is_not_empty()
-            self._para(unicode(com), comment_style)
+            self._para(escape_xml(unicode(com)), comment_style)
 
     def add_contacts(self, *nodes, **kwargs):
         context = kwargs.pop('context', None)
@@ -701,7 +698,7 @@ class Booklet(object):
 
     def add_address(self, link, addr, prefix=''):
         self._is_not_empty()
-        self._para(prefix + addr.as_unicode(with_country=False),
+        self._para(prefix + escape_xml(addr.as_unicode(with_country=False)),
                    address_style)
         self.indent += 1
         self.add_comments(link, addr)

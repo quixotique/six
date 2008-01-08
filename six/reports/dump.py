@@ -4,11 +4,13 @@ r'''Dump report.
 '''
 
 import sys
+import locale
 from collections import defaultdict
 from itertools import chain
 from six.multilang import multilang
 from six.sort import *
 from six.node import *
+from six.node import node_predicate
 from six.links import *
 from six.person import *
 from six.family import *
@@ -23,6 +25,8 @@ from six.comment import *
 from six.uniq import uniq
 
 def report_dump_getopt(parser):
+    lang, enc = locale.getlocale()
+    parser.values.encoding = enc
     parser.add_option('-e', '--encode',
                       action='store', type='string', dest='encoding',
                       help='use ENCODE as output encoding')
@@ -31,13 +35,11 @@ def report_dump(options, model, predicate, local):
     # If no predicate given, then select all people, organisations, and
     # families.
     if predicate is None:
-        predicate = (instance_p(Person) |
-                     instance_p(Company) |
-                     instance_p(Family))
+        predicate = node_predicate(lambda node: True)
     # Populate the top level of the report with all the nodes that satisfy the
     # predicate.
     itemiser = Itemiser()
-    itemiser.update(model.nodes(is_other(predicate)))
+    itemiser.update(model.nodes(is_other(instance_p(NamedNode) & predicate)))
     # Add nodes that are implied by the predicate:
     # - A selected person implies the family they belong to.
     for node in list(itemiser):

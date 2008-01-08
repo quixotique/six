@@ -3,6 +3,7 @@
 r'''Booklet report.
 '''
 
+import locale
 from six.sort import *
 from six.model import *
 from six.node import *
@@ -13,6 +14,8 @@ from six.org import *
 from six.reports.dump import dump_comments, telephones, qual_home, qual_work
 
 def report_phone_getopt(parser):
+    lang, enc = locale.getlocale()
+    parser.values.encoding = enc
     parser.add_option('-e', '--encode',
                       action='store', type='string', dest='encoding',
                       help='use ENCODE as output encoding')
@@ -23,7 +26,7 @@ def report_phone(options, model, predicate, local):
                                             instance_p(Company))
     tkw = {'fax': False, 'bold': True}
     itemiser = Itemiser()
-    itemiser.update(model.nodes(predicate))
+    itemiser.update(model.nodes(is_other(instance_p(NamedNode) & predicate)))
     # Remove entries for families for which one or more of the heads was found.
     people = filter(lambda node: isinstance(node, Person), itemiser)
     for person in people:

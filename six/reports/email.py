@@ -3,8 +3,10 @@
 r'''Booklet report.
 '''
 
+import locale
 from six.sort import *
 from six.node import *
+from six.node import node_predicate
 from six.links import *
 from six.person import *
 from six.family import *
@@ -12,21 +14,22 @@ from six.org import *
 from six.email import *
 
 def report_email_getopt(parser):
+    parser.values.all = False
     parser.add_option('-a', '--all',
                       action='store_true', dest='all',
                       help='print all possible values')
+    lang, enc = locale.getlocale()
+    parser.values.encoding = enc
     parser.add_option('-e', '--encode',
                       action='store', type='string', dest='encoding',
                       help='use ENCODE as output encoding')
 
 def report_email(options, model, predicate, local):
     if predicate is None:
-        predicate = (instance_p(Person) |
-                     instance_p(Company) |
-                     instance_p(Family))
+        predicate = node_predicate(lambda node: True)
         options.all = False
     itemiser = Itemiser()
-    itemiser.update(model.nodes(is_other(predicate)))
+    itemiser.update(model.nodes(is_other(instance_p(NamedNode) & predicate)))
     # Remove entries for families for which one or more of the heads was found.
     for person in filter(lambda node: isinstance(node, Person), itemiser):
         for belongs_to in person.links(outgoing & is_link(Belongs_to)):
@@ -50,8 +53,7 @@ def report_email(options, model, predicate, local):
                     (outgoing & is_link(Resides_at)))
             if not options.all:
                 stop = instance_p(Organisation)
-        else:
-            assert isinstance(node, Person)
+        elif isinstance(node, Person):
             pred = ((outgoing & is_link(Belongs_to)) |
                     (outgoing & is_link(Resides_at)) |
                     (outgoing & is_link(Works_at)))

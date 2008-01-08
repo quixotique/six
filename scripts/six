@@ -20,7 +20,7 @@ import six.parse as parse
 from six.test import run_doctest
 from six.input import InputError
 from six.model import Model, ModelParser
-from six.node import name_imatches, NamedNode, in_place
+from six.node import name_imatches, in_place
 from six.links import from_node
 from six.keyword import keyed_with
 from six.reports.dump import report_dump, report_dump_getopt
@@ -60,7 +60,7 @@ def main():
     op.add_option('-o', '--output',
                   action='store', type='string', dest='output_path',
                   help='write output to file pathname instead of stdout')
-    op.set_defaults(report='dump', encoding=enc)
+    op.set_defaults(report='dump')
     options, args = op.parse_args()
     path = os.path.join(os.environ['HOME'], 'me', 'contacts', 'nlist')
     cache = os.path.join(os.path.dirname(path),
@@ -127,7 +127,7 @@ def main():
                         place = model.lookup_place(arg[3:])
                     except LookupError, e:
                         raise ArgError(e, arg=arg[3:])
-                    p = instance_p(NamedNode) & in_place(place)
+                    p = in_place(place)
                 else:
                     p = name_imatches(arg.decode(enc))
                 if pred is None:
