@@ -25,11 +25,16 @@ from six.email import *
 from six.struct import struct
 
 def report_book_getopt(parser):
+    parser.values.pagesize = 'filofax'
     parser.add_option('-p', '--pagesize',
                       action='store', dest='pagesize',
                       choices=sorted(page_sizes),
                       help='use PAGESIZE as logical page size')
-    parser.values.pagesize = 'filofax'
+    parser.values.sections = 'none'
+    parser.add_option('-s', '--sections',
+                      action='store', dest='sections',
+                      choices=sorted(sections),
+                      help='use SECTIONS as alphabetic section grouping')
 
 def report_book(options, model, predicate, local):
     if not options.output_path:
@@ -86,7 +91,8 @@ def report_book(options, model, predicate, local):
     cull_references(toplevel)
     # Format the report.
     booklet = Booklet(predicate=predicate, refs=refs, local=local,
-                      page_size=page_sizes[options.pagesize])
+                      page_size=page_sizes[options.pagesize],
+                      sections=sections[options.sections])
     for item in toplevel:
         if item.node is not None:
             booklet.add_entry(item)
@@ -109,6 +115,20 @@ page_sizes = {
                            margin_left= 1 * cm),
     'agenda-juana': struct(size=       (7.6 * cm, 13.6 * cm),
                            margin_left= 7 * mm),
+}
+
+sections = {
+    'none':         None,
+    'single':       ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
+                     'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
+                     'U', 'V', 'W', 'X', 'Y', 'Z'),
+    'single-wxyz':  ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
+                     'K', 'L', 'M', 'N', 'O', 'PQ', 'R', 'S', 'T',
+                     'UV', 'WXYZ'),
+    'pair':         ('AB', 'CD', 'EF', 'GH', 'IJ', 'KL', 'MN', 'OP',
+                     'QR', 'ST', 'UV', 'WX', 'YZ'),
+    'triple':       ('ABC', 'DEF', 'GHI', 'JKL', 'MNO', 'PQR', 'STU',
+                     'VWX', 'YZ'),
 }
 
 def rotated(xy):
@@ -165,9 +185,6 @@ continue_style=ParagraphStyle(name='Continue',
                             fontSize=8, leading=9)
 
 
-sections = ('AB', 'CD', 'EF', 'GH', 'IJ', 'KL', 'MN',
-            'OP', 'QR', 'ST', 'UV', 'WX', 'YZ')
-
 qual_home = multilang(en='home', es='casa')
 qual_work = multilang(en='work', es='trab')
 NBSP = u'\u00a0'
@@ -184,11 +201,12 @@ class Booklet(object):
 
     gutter = 0
 
-    def __init__(self, predicate, refs, local, page_size):
+    def __init__(self, predicate, refs, local, page_size, sections):
         self.predicate = predicate
         self.refs = refs
         self.local = local
         self.page_size = page_size
+        self.sections = sections
         self.section = 0
         best_paper_size = best_paper_margins = None
         best_n = 0
@@ -223,7 +241,8 @@ class Booklet(object):
                     showBoundary=  True))
         self.page = PageTemplate(frames=frames)
         self.doc = BookletDoc(None,
-                    initialSection=sections[self.section],
+                    initialSection=self.sections[self.section] if self.sections
+                                   else 'A-Z',
                     headerLeft=time.strftime(r'%-d %b %Y'),
                     headerRight=unicode(multilang(en='Page', es=u'Página')) +
                                 u' <seq id="page" />',
@@ -242,18 +261,16 @@ class Booklet(object):
         '''
         self.doc.build(self.flowables, filename=path)
 
-    def set_section(self, section):
-        self.flowables.append(ActionFlowable(('newSection', sections[section])))
-        self.section = section
-
     def add_entry(self, item):
         letter = text_sort_key(item.key)[:1].upper() or 'Z'
-        section = self.section
-        while letter not in sections[section]:
-            section += 1
-        if section != self.section:
-            self.set_section(section)
-            self.flowables.append(FrameBreak())
+        if self.sections:
+            section = self.section
+            while letter not in self.sections[section]:
+                section += 1
+                self.flowables.append(ActionFlowable(('newSection',
+                                                      self.sections[section])))
+                self.flowables.append(FrameBreak())
+                self.section = section
         self.entry = []
         self.indent = 0
         self._empty_flag = True
