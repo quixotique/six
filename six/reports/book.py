@@ -755,9 +755,9 @@ class CutFrame(Frame):
     def drawBoundary(self, canv):
         r'''Draw the frame boundary as cut marks.
         '''
-        from reportlab.lib.colors import black
+        from reportlab.lib.colors import grey
         canv.saveState()
-        canv.setStrokeColor(black)
+        canv.setStrokeColor(grey)
         canv.setLineWidth(.1)
         for x in self._x1, self._x2:
             for y in self._y1, self._y2:
