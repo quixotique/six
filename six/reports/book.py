@@ -202,7 +202,6 @@ class Booklet(object):
                 best_np = np
         assert best_n >= 1
         assert best_paper_size
-        print 'best_n=%d' % best_n
         frames = []
         for iy in xrange(best_np[1]):
             for ix in xrange(best_np[0]):
