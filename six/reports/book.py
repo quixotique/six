@@ -161,6 +161,11 @@ header_right_style=ParagraphStyle(name='HeaderRight',
                             alignment=TA_RIGHT,
                             leading=0)
 
+continue_style=ParagraphStyle(name='Continue',
+                            fontName='Times-Italic',
+                            fontSize=8, leading=9)
+
+
 sections = ('AB', 'CD', 'EF', 'GH', 'IJ', 'KL', 'MN',
             'OP', 'QR', 'ST', 'UV', 'WX', 'YZ')
 
@@ -254,6 +259,8 @@ class Booklet(object):
         self.indent = 0
         self._empty_flag = True
         self.start_keep_together()
+        self.entry.append(ActionFlowable(('entryTitle',
+            Paragraph(escape_xml(item.key + '...'), continue_style))))
         if item is not item.single:
             self.add_names([item.key], refname=item.single.key, bold=False)
             rulegap = 4
@@ -269,6 +276,7 @@ class Booklet(object):
                 assert False, repr(item.node)
             rulegap = 2
         self.entry.append(Rule(height=.5, spaceBefore=rulegap, spaceAfter=1))
+        self.entry.append(ActionFlowable(('entryTitle', None)))
         self.end_keep_together()
         self.flowables.extend(self.entry)
 
@@ -708,9 +716,13 @@ class BookletDoc(BaseDocTemplate):
         self.__section = initialSection
         self.__headerLeft = headerLeft
         self.__headerRight = headerRight
+        self.__entryTitle = None
 
     def handle_newSection(self, section):
         self.__section = section
+
+    def handle_entryTitle(self, title):
+        self.__entryTitle = title
 
     def handle_frameBegin(self, resume=0):
         BaseDocTemplate.handle_frameBegin(self, resume=resume)
@@ -721,6 +733,8 @@ class BookletDoc(BaseDocTemplate):
         self.frame.add(Paragraph(' '.join(list(self.__section)), header_style),
                        self.canv)
         self.frame.add(Rule(height=.5, spaceBefore=2, spaceAfter=1), self.canv)
+        if self.__entryTitle:
+            self.frame.add(self.__entryTitle, self.canv)
 
 class CutFrame(Frame):
 
