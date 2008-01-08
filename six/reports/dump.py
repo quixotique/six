@@ -26,7 +26,7 @@ from six.uniq import uniq
 
 def report_dump_getopt(parser):
     lang, enc = locale.getlocale()
-    parser.values.encoding = enc
+    parser.set_defaults(encoding=enc)
     parser.add_option('-e', '--encode',
                       action='store', type='string', dest='encoding',
                       help='use ENCODE as output encoding')

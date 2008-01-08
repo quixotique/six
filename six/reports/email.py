@@ -14,12 +14,11 @@ from six.org import *
 from six.email import *
 
 def report_email_getopt(parser):
-    parser.values.all = False
+    lang, enc = locale.getlocale()
+    parser.set_defaults(encoding=enc, all=False)
     parser.add_option('-a', '--all',
                       action='store_true', dest='all',
                       help='print all possible values')
-    lang, enc = locale.getlocale()
-    parser.values.encoding = enc
     parser.add_option('-e', '--encode',
                       action='store', type='string', dest='encoding',
                       help='use ENCODE as output encoding')

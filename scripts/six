@@ -31,76 +31,85 @@ from six.reports.phone import report_phone, report_phone_getopt
 def main():
     locale.setlocale(locale.LC_ALL, '')
     lang, enc = locale.getlocale()
+    path = os.path.join(os.environ['HOME'], 'me', 'contacts', 'nlist')
+    cache = os.path.join(os.path.dirname(path),
+                         '.six-cache-' + os.path.basename(path))
     reports = dict([(name[7:], (obj, globals().get(name + '_getopt')))
                             for name, obj in globals().iteritems()
                             if callable(obj) and name.startswith('report_')])
     assert reports
-    assert 'dump' in reports
-    def select_report(option, optstr, value, parser):
-        r'''When the --report option is parsed, call the report's getopt
-        function, which may populate the option parser with more options.
-        '''
-        parser.values.report = value
-        getopt_func = reports[value][1]
-        if getopt_func:
-            getopt_func(parser)
     op = OptionParser(usage=
         'Usage: %prog --doctest [doctest-options] [module ...]\n'
-        '       %prog [options] [expr]')
+        '       %prog [-r|--report=REPORT] [report-options] [expr]')
     op.add_option('--doctest', action='callback', callback=opt_doctest,
                   help='run doctests (see --doctest --help for options)')
     op.add_option('-l', '--local',
                   action='store', type='string', dest='local',
                   help='output addresses and telephone numbers relative to '
                        'the country or area named LOCAL')
-    op.add_option('-r', '--report',
-                  action='callback', type='choice', callback=select_report,
-                  choices=sorted(reports),
-                  help='select output report')
     op.add_option('-o', '--output',
                   action='store', type='string', dest='output_path',
                   help='write output to file pathname instead of stdout')
-    op.set_defaults(report='dump')
-    options, args = op.parse_args()
-    path = os.path.join(os.environ['HOME'], 'me', 'contacts', 'nlist')
-    cache = os.path.join(os.path.dirname(path),
-                         '.six-cache-' + os.path.basename(path))
-    # If the cache exists, attempt to read the model from it.  In the event
-    # that it fails to read correctly, silently skip it and proceed to compile
-    # the model from source, then save the compiled model in the cache.
-    model = None
-    if (    os.path.exists(cache) and
-            (os.stat(path).st_mtime <= os.stat(cache).st_mtime) and
-            (os.stat(sys.argv[0]).st_mtime <= os.stat(cache).st_mtime)):
-        try:
-            model = pickle.load(file(cache, 'r'))
-        except StandardError:
-            pass
-    if model is None:
-        model = Model()
-        parser = ModelParser(model)
-        try:
-            for block in parse.blocks(parse.remove_comments(parse.lines(path))):
-                parser.parse_block(block)
-            parser.finish_parsing()
-        except InputError, e:
-            print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]),
-                                            str(e))
-            sys.exit(1)
-        finally:
-            parser.finalise()
-        try:
-            os.remove(cache)
-        except OSError, e:
-            if e.errno != errno.ENOENT:
-                raise
-        orl = sys.getrecursionlimit()
-        sys.setrecursionlimit(4000)
-        pickle.dump(model, file(cache, 'w'))
-        sys.setrecursionlimit(orl)
-    # Parse command-line args as search expression.  If no args, then select
-    # all nodes.
     try:
+        # Parse the first argument(s) as the report type option.  If absent,
+        # select the default report.
+        args = sys.argv[1:]
+        if args and args[0].startswith('-r='):
+            arg = args.pop(0)
+            report = arg[3:]
+        elif args and args[0].startswith('--report='):
+            arg = args.pop(0)
+            report = arg[9:]
+        elif args and args[0] in ('-r', '--report'):
+            arg = args.pop(0)
+            report = args.pop(0) if args else None
+        else:
+            report = 'dump'
+        if not report:
+            raise ArgError('missing report name', arg=arg)
+        try:
+            report, getopt = reports[report]
+        except KeyError:
+            raise ArgError('unsupported report', arg=report)
+        # Call the report's getopt function, if available, to populate the
+        # option parser with the report-specific options.
+        if getopt:
+            getopt(op)
+        # Parse the command-line options.
+        options, args = op.parse_args(args)
+        # If the cache exists, attempt to read the model from it.  In the event
+        # that it fails to read correctly, silently skip it and proceed to
+        # compile the model from source, then save the compiled model in the
+        # cache.
+        model = None
+        if (    os.path.exists(cache) and
+                (os.stat(path).st_mtime <= os.stat(cache).st_mtime) and
+                (os.stat(sys.argv[0]).st_mtime <= os.stat(cache).st_mtime)):
+            try:
+                model = pickle.load(file(cache, 'r'))
+            except StandardError:
+                pass
+        if model is None:
+            model = Model()
+            parser = ModelParser(model)
+            try:
+                for block in parse.blocks(parse.remove_comments(parse.lines(path))):
+                    parser.parse_block(block)
+                parser.finish_parsing()
+            finally:
+                parser.finalise()
+            try:
+                os.remove(cache)
+            except OSError, e:
+                if e.errno != errno.ENOENT:
+                    raise
+            orl = sys.getrecursionlimit()
+            sys.setrecursionlimit(4000)
+            pickle.dump(model, file(cache, 'w'))
+            sys.setrecursionlimit(orl)
+        # Determine the local location for relative rewriting of addresses and
+        # telephone numbers.  If not given as a command-line option, then look
+        # in an environment variable.
         local = None
         localn = None
         if options.local:
@@ -113,6 +122,8 @@ def main():
                 local = model.lookup_place(os.environ['SIX_LOCAL'])
             except LookupError, e:
                 raise EnvError(e, var='SIX_LOCAL')
+        # Parse command-line args as search expression.  If no args, then
+        # select all nodes.
         pred = None
         if len(args):
             for arg in args:
@@ -135,10 +146,10 @@ def main():
                 else:
                     pred = pred & p
         # Print the selected report.
-        reports[options.report][0](options, model, pred, local)
+        report(options, model, pred, local)
     except InputError, e:
         print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]), str(e))
-        sys.exit(2)
+        sys.exit(1)
 
 def opt_doctest(option, opt_str, value, parser):
     op = OptionParser(usage=r'Usage: %prog --doctest [options] [module ...]')

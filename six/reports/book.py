@@ -25,12 +25,11 @@ from six.email import *
 from six.struct import struct
 
 def report_book_getopt(parser):
-    parser.values.pagesize = 'filofax'
+    parser.set_defaults(pagesize='filofax', sections='none')
     parser.add_option('-p', '--pagesize',
                       action='store', dest='pagesize',
                       choices=sorted(page_sizes),
                       help='use PAGESIZE as logical page size')
-    parser.values.sections = 'none'
     parser.add_option('-s', '--sections',
                       action='store', dest='sections',
                       choices=sorted(sections),
@@ -755,7 +754,7 @@ class CutFrame(Frame):
     def drawBoundary(self, canv):
         r'''Draw the frame boundary as cut marks.
         '''
-        from reportlab.lib.colors import grey
+        from reportlab.lib.colors import black, grey
         canv.saveState()
         canv.setStrokeColor(grey)
         canv.setLineWidth(.1)

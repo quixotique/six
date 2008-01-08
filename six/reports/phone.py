@@ -15,7 +15,7 @@ from six.reports.dump import dump_comments, telephones, qual_home, qual_work
 
 def report_phone_getopt(parser):
     lang, enc = locale.getlocale()
-    parser.values.encoding = enc
+    parser.set_defaults(encoding=enc)
     parser.add_option('-e', '--encode',
                       action='store', type='string', dest='encoding',
                       help='use ENCODE as output encoding')
