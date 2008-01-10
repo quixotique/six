@@ -136,16 +136,21 @@ def rotated(xy):
 styles = getSampleStyleSheet()
 
 name_style = ParagraphStyle(name='Name',
-                            spaceAfter=2,
-                            fontSize=10, leading=10)
+                            fontSize=10, leading=12)
 
-toplevel_ref_style = ParagraphStyle(name='TopReference',
-                            parent=name_style,
-                            leftIndent=24, firstLineIndent=-24)
+aka_style = ParagraphStyle(name='Aka',
+                            fontSize=8, leading=10)
 
 ref_style = ParagraphStyle(name='Reference',
-                            parent=name_style,
-                            fontSize=9, leading=10)
+                            parent=aka_style)
+
+toplevel_ref_style = ParagraphStyle(name='TopReference',
+                            parent=ref_style,
+                            leftIndent=24, firstLineIndent=-24)
+
+name_comment_style = ParagraphStyle(name='NameComment',
+                            parent=aka_style,
+                            fontName='Times-Italic')
 
 comment_style=ParagraphStyle(name='Comment',
                             fontName='Times-Italic',
@@ -190,7 +195,10 @@ NBSP = u'\u00a0'
 EN_DASH = u'\u2013'
 EM_DASH = u'\u2014'
 RIGHT_ARROW = u'\u2192'
-BLACK_BOX = u'\u25c6'
+BLACK_DIAMOND = u'\u25c6'
+HEAVY_VERTICAL_BAR = u'\u275a'
+EMAIL_BULLET = BLACK_DIAMOND_MINUS_WHITE_X = u'\u2756'
+TELEPHONE_BULLET = BLACK_TELEPHONE = u'\u260e'
 
 class Booklet(object):
 
@@ -238,6 +246,8 @@ class Booklet(object):
                     topPadding=    3 * mm,
                     bottomPadding= 3 * mm,
                     showBoundary=  True))
+        self.page_width = (self.page_size.size[0] - 6 * mm
+                                                  - self.page_size.margin_left)
         self.page = PageTemplate(frames=frames)
         self.doc = BookletDoc(None,
                     initialSection=self.sections[self.section] if self.sections
@@ -252,7 +262,6 @@ class Booklet(object):
                 )
         self.flowables = []
         self._keeptogether_stack = []
-        self._notempty_stack = []
 
     def write_pdf_to(self, path):
         r'''Generate the PDF for the booklet, writing it to a file with the
@@ -277,8 +286,9 @@ class Booklet(object):
         self.entry.append(ActionFlowable(('entryTitle',
             Paragraph(escape_xml(item.key + '...'), continue_style))))
         if item is not item.single:
-            self.add_names([item.key], refname=item.single.key, bold=False)
-            rulegap = 4
+            self.add_names([item.key], refname=item.single.key, bold=False,
+                           refstyle=toplevel_ref_style)
+            rulegap = 2
         else:
             self.add_names([item.key] + list(item.node.names()))
             if isinstance(item.node, Person):
@@ -313,28 +323,27 @@ class Booklet(object):
         r'''Return true if invoking the given callable would produce any
         important content, such as comments, birthday, contacts or addresses.
         '''
-        self._notempty_stack.append((self.entry, self.indent, self._empty_flag))
+        entry, indent, eflag = self.entry, self.indent, self._empty_flag
         self.entry = []
         self._empty_flag = True
         func()
         ret = self._empty_flag
-        self.entry, self.indent, self._empty_flag = self._notempty_stack.pop()
+        self.entry, self.indent, self._empty_flag = entry, indent, eflag
         return ret
 
     def if_not_empty(self, func):
         r'''Append content to the current entry by calling func(), but if func
         tests as empty, then do not append anything.
         '''
-        self._notempty_stack.append((self.entry, self.indent, self._empty_flag))
+        entry, indent, eflag = self.entry, self.indent, self._empty_flag
         self.entry = []
         self._empty_flag = True
         func()
         if not self._empty_flag:
-            top = self._notempty_stack.pop()
-            self.entry = top[0] + self.entry
-            self._empty_flag = top[2]
+            self.entry = entry + self.entry
+            self._empty_flag = eflag
             return True
-        self.entry, self.indent, self._empty_flag = self._notempty_stack.pop()
+        self.entry, self.indent, self._empty_flag = entry, indent, eflag
         return False
 
     def _is_not_empty(self):
@@ -343,31 +352,74 @@ class Booklet(object):
         '''
         self._empty_flag = False
 
-    def _para(self, text, style, bullet='', proud=False, returnIndent=0):
-        r'''Append a paragraph to the current entry.
+    def _para(self, text, style, bullet='', proud=False,
+              returnIndent=0, firstIndent=0, join_to_prev=False):
+        r'''Append a paragraph to the current entry.  If the 'join_to_prev'
+        argument is True then make the paragraph a continuation of the
+        immediately preceding paragraph.
         '''
         lefti = style.leftIndent + 12 * self.indent + returnIndent
-        firsti = style.firstLineIndent - returnIndent
+        firsti = style.firstLineIndent + firstIndent - returnIndent
         if bullet:
             bw = stringWidth(bullet, style.fontName, style.fontSize)
             firsti -= bw
             if not proud:
                 lefti += bw
+        paraclass = Paragraph
+        if join_to_prev:
+            # To accomplish a continuation paragraph, we use a variant of
+            # Paragraph that reports its wrapped height as one line less than
+            # it actually is.  This causes the reportlab document flow layout
+            # to position it one line higher than it would actually be
+            # otherwise, which makes its first line coincide vertically with
+            # the last line of the prior paragraph.  So then, we make the
+            # continuation paragraph have a first line indent that clears the
+            # last line of the prior paragraph, plus a bit of space, and voila!
+            # (But there's a wrinkle... see below.)
+            prev = self.entry[-1]
+            assert isinstance(prev, Paragraph)
+            prev.wrap(availWidth=self.page_width, availHeight=1000*cm)
+            w = prev.getActualLineWidths0()[-1]
+            paraclass = ShortWrapParagraph
+            firsti = w + style.fontSize / 2 - lefti
         istyle = ParagraphStyle(
                         name=           '%s-%d' % (style.name, self.indent),
                         parent=         style,
                         leftIndent=     lefti,
                         firstLineIndent=firsti)
-        self.entry.append(Paragraph(bullet + text, istyle))
+        para = paraclass(bullet + text, istyle)
+        if join_to_prev:
+            # The reportlab paragraph wrapping logic always places the first
+            # word on the first line, so when continuing the prior paragraph,
+            # if there isn't enough space left on the prior paragraph's last
+            # line, it can cause the first line of the continuing paragraph to
+            # spill out of the available width.  In this case, we don't
+            # continue the last line of the prior paragraph, we just start a
+            # new paragraph under it.
+            para.wrap(availWidth=self.page_width, availHeight=1000*cm)
+            if para.getActualLineWidths0()[0] > self.page_width:
+                istyle = ParagraphStyle(
+                        name=           '%s-%d' % (style.name, self.indent),
+                        parent=         style,
+                        leftIndent=     lefti,
+                        firstLineIndent=0)
+                para = Paragraph(bullet + text, istyle)
+        self.entry.append(para)
+        return para
 
     def add_names(self, names, refname=None, bullet='', bold=True,
-                  prefix='', suffix='', comments=()):
+                  prefix='', suffix='', comments=(),
+                  style=name_style, akastyle=aka_style, refstyle=ref_style,
+                  comstyle=name_comment_style):
         names = uniq(names)
         first = names.next()
         if bold:
             startbold, endbold = u'<b>', u'</b>'
         else:
             startbold, endbold = u'', u''
+        if bullet:
+            bullet = bullet + ' '
+        bulletWidth = stringWidth(bullet, style.fontName, style.fontSize)
         if hasattr(first, 'sortsplit'):
             pre, sort, post = first.sortsplit()
             name = u''.join([escape_xml(pre),
@@ -377,21 +429,27 @@ class Booklet(object):
             name = startbold + escape_xml(unicode(first)) + endbold
         first = unicode(first)
         para = [prefix, name, suffix]
+        self._para(u''.join(para), style, bullet=bullet)
+        # Join AKA names onto the end of the name.
+        para = []
         for aka in map(unicode, names):
             if aka != first:
-                para += [u' <font size="%d">=' % (name_style.fontSize - 2),
-                         NBSP, escape_xml(aka), u'</font>']
+                para += [u' =', NBSP, escape_xml(aka)]
+        if para:
+            self._para(u''.join(para), akastyle, returnIndent=bulletWidth,
+                       join_to_prev=True)
+        # Join reference arrow and text onto end of name.
         if refname:
-            para += [(u' <font size="%d">' % (toplevel_ref_style.leading - 2)),
-                     RIGHT_ARROW, u' ', escape_xml(refname), u'</font>']
-        if bullet:
-            bullet = bullet + ' '
-        if comments:
-            para += [u' <font size="%d"><i>' % (name_style.fontSize - 2),
-                     ' '.join(EN_DASH + NBSP + escape_xml(unicode(c))
-                              for c in comments),
-                     u'</i></font>']
-        self._para(u''.join(para), name_style, bullet=bullet)
+            para = [' ', RIGHT_ARROW, NBSP, escape_xml(refname)]
+            self._para(u''.join(para), refstyle, returnIndent=bulletWidth,
+                       join_to_prev=True)
+        # Join comments onto end of name.
+        para = []
+        for c in comments:
+            para += [' ', EN_DASH, NBSP, escape_xml(unicode(c))]
+        if para:
+            self._para(u''.join(para), comstyle, returnIndent=bulletWidth,
+                       join_to_prev=True)
 
     def add_person(self, per, link=None, show_family=True,
                                                show_work=True):
@@ -531,32 +589,33 @@ class Booklet(object):
         parent = None
         if show_parents:
             if isinstance(org, Department):
-                self.start_keep_together()
                 # If the parent organisation has a top level entry, then refer
                 # to it.  Otherwise, we list it below.
                 parent = org.link(incoming & is_link(Has_department))
                 assert parent is not None
                 if parent.company in self.refs:
+                    self.start_keep_together()
                     self.add_names([parent.company.sort_keys().next()],
                                    bullet=RIGHT_ARROW, bold=False,
                                    comments=self.all_comments(parent))
                     parent = None
-                self.end_keep_together()
+                    self.end_keep_together()
         self.add_addresses(org)
         self.add_contacts(org, link)
         if parent:
+            self.start_keep_together()
             self.add_names([parent.company.sort_keys().next()],
                            bullet=EM_DASH, bold=True,
                            comments=self.all_comments(parent))
             self.add_organisation(parent.company, parent,
                                   show_departments=False,
                                   show_workers=show_workers)
+            self.end_keep_together()
         self.indent -= 1
         if show_workers:
             self.add_works_at(org)
         if show_departments:
-            for link in org.links(outgoing & is_link(Has_department)):
-                self.start_keep_together()
+            for link in sorted(org.links(outgoing & is_link(Has_department))):
                 # Departments' top level entries are always references to their
                 # parent company's top level entry.  So we list departments
                 # here in full -- no references.  Only departments with top
@@ -569,6 +628,7 @@ class Booklet(object):
                                                             link.dept, top, com)
                 if top or link.is_head or self.predicate(link):
                     self._is_not_empty()
+                    self.start_keep_together()
                     self.add_names(link.dept.names(),
                                    bullet=EM_DASH, bold=True)
                     self.indent += 1
@@ -576,7 +636,7 @@ class Booklet(object):
                     self.add_organisation(link.dept, link,
                                           show_workers=show_workers)
                     self.indent -= 1
-                self.end_keep_together()
+                    self.end_keep_together()
 
     def add_works_at(self, org):
         for link in sorted(org.links(incoming & is_link(Works_at))):
@@ -657,6 +717,7 @@ class Booklet(object):
                     self._is_not_empty()
                     label = ''
                     if isinstance(link, Has_email):
+                        bullet = EMAIL_BULLET
                         cnode = link.email
                         contact = escape_xml(str(cnode).replace(u' ', NBSP))
                         if isinstance(link, At_work):
@@ -668,6 +729,7 @@ class Booklet(object):
                         if label:
                             label = '<i>' + label + '</i>'
                     else:
+                        bullet = TELEPHONE_BULLET
                         cnode = link.tel
                         contact = (u'<b>' +
                             escape_xml(unicode(link.tel.relative(self.local))) +
@@ -702,7 +764,7 @@ class Booklet(object):
                         comments = ''
                     if label:
                         label += u': '
-                    label = BLACK_BOX + u' ' + label
+                    label = bullet + u' ' + label
                     contacts.append((label + contact).replace(u' ', NBSP) +
                                     comments)
         self._para(u' '.join(contacts), contacts_style)
@@ -765,6 +827,12 @@ class CutFrame(Frame):
                 canv.lines([(-10, 0, 10, 0), (0, -10, 0, 10)])
                 canv.restoreState()
         canv.restoreState()
+
+class ShortWrapParagraph(Paragraph):
+    def wrap(self, availWidth, availHeight):
+        w, h = Paragraph.wrap(self, availWidth, availHeight)
+        assert h >= self.style.leading
+        return w, h - self.style.leading
 
 class Rule(Flowable):
 

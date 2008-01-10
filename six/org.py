@@ -46,6 +46,9 @@ class Organisation(NamedNode):
             for name in self.aka:
                 yield name
 
+    def sortkey(self):
+        return self.names().next()
+
     def all_parents(self):
         r'''Iterate through all the organisations that this organisation
         belongs to, in breadth-wise bottom-up order (ie, each organisation of
@@ -128,6 +131,12 @@ class Has_department(Link):
         self.company = company
         self.dept = dept
         self.is_head = bool(is_head)
+
+    def __cmp__(self, other):
+        if not isinstance(other, Has_department):
+            return NotImplemented
+        return (cmp(0 if self.is_head else 1, 0 if other.is_head else 1) or
+                cmp(self.dept.sortkey(), other.dept.sortkey()))
 
     def only_place(self):
         r'''The place of a company is the default place of its departments.
