@@ -679,15 +679,19 @@ class ModelParser(object):
 
     def parse_works_at(self, part, who, org):
         r'''Create a Works_at association between a person and organisation,
-        and parse work contact details that pertain to the association link.
-        This method is used when the works-at relationship is implicit (ie, not
-        explicitly defined with a 'work' line), so the link does not have its
-        own sub-part to contain contact and other details.  Whether or not the
-        person is a head of the organisation is derived from the part's
-        delimiter, in make_assoc().
+        and parse comment, keyword, and work contact details that pertain to
+        the association link.  This method is used when the works-at
+        relationship is implicit (ie, not explicitly defined with a 'work'
+        line), so the link does not have its own sub-part to contain contact
+        and other details.  Whether or not the person is a head of the
+        organisation is derived from the part's delimiter, in make_assoc().
         '''
         wat = self.make_assoc(part, who, org, Works_at)
         self.parse_con(part, wat, 'comw', Comment, Has_comment)
+        if 'keyw' in part:
+            for text in part.mgetvalue('keyw'):
+                for keyword in self.split_keywords(text):
+                    self.add_keyword(wat, keyword, part)
         self.parse_contacts_work(part, wat)
         return wat
 
@@ -861,9 +865,18 @@ class ModelParser(object):
             for text in part.mgetvalue('key'):
                 for keyword in self.split_keywords(text):
                     if keyword not in omit:
-                        if not node.link(outgoing & is_link(Keyed_with) &
-                                        to_node(keyword)):
-                            Keyed_with(node, keyword, timestamp=part.updated)
+                        self.add_keyword(node, keyword, part)
+
+    def add_keyword(self, node, keyword, part=None):
+        r'''Link the given Keyword to the given Node, if not already linked.
+        Take the timestamp and any other context from the part which gave rise
+        to the link.  Return the Link which was found or created.
+        '''
+        link = node.link(outgoing & is_link(Keyed_with) & to_node(keyword))
+        if not link:
+            link = Keyed_with(node, keyword,
+                              timestamp= part.updated if part else None)
+        return link
 
     def split_keywords(self, text):
         r'''Parse a string contining zero or more keywords and iterate over the
