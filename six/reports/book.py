@@ -122,7 +122,7 @@ sections = {
                      'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
                      'U', 'V', 'W', 'X', 'Y', 'Z'),
     'single-wxyz':  ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
-                     'K', 'L', 'M', 'N', 'O', 'PQ', 'R', 'S', 'T',
+                     'K', 'L', 'M', 'NO', 'PQ', 'R', 'S', 'T',
                      'UV', 'WXYZ'),
     'pair':         ('AB', 'CD', 'EF', 'GH', 'IJ', 'KL', 'MN', 'OP',
                      'QR', 'ST', 'UV', 'WX', 'YZ'),
@@ -288,7 +288,6 @@ class Booklet(object):
         if item is not item.single:
             self.add_names([item.key], refname=item.single.key, bold=False,
                            refstyle=toplevel_ref_style)
-            rulegap = 2
         else:
             self.add_names([item.key] + list(item.node.names()))
             if isinstance(item.node, Person):
@@ -297,8 +296,11 @@ class Booklet(object):
                 self.add_family(item.node)
             elif isinstance(item.node, Company):
                 self.add_organisation(item.node)
-            rulegap = 2
-        self.entry.append(Rule(height=.5, spaceBefore=rulegap, spaceAfter=1))
+        last_flowable = self.entry.pop()
+        self.entry.append(KeepTogether([
+                last_flowable,
+                Rule(lineWidth=.5, spaceBefore=2, spaceAfter=1)],
+            maxHeight= 4 * cm))
         self.entry.append(ActionFlowable(('entryTitle', None)))
         self.end_keep_together()
         self.flowables.extend(self.entry)
@@ -807,7 +809,8 @@ class BookletDoc(BaseDocTemplate):
                        self.canv)
         self.frame.add(Paragraph(' '.join(list(self.__section)), header_style),
                        self.canv)
-        self.frame.add(Rule(height=.5, spaceBefore=2, spaceAfter=1), self.canv)
+        self.frame.add(Rule(lineWidth=.5, spaceBefore=2, spaceAfter=1),
+                       self.canv)
         if self.__entryTitle:
             self.frame.add(self.__entryTitle, self.canv)
 
@@ -836,14 +839,16 @@ class ShortWrapParagraph(Paragraph):
 
 class Rule(Flowable):
 
-    """A horizontal line."""
+    """A horizontal line.  It appears to have zero height, so that it doesn't
+    get separated from its preceding flowable by a frame break."""
 
     _fixedWidth = False
     _fixedHeight = True
 
-    def __init__(self, width=None, height=1, spaceBefore=0, spaceAfter=0):
+    def __init__(self, width=None, lineWidth=1, spaceBefore=0, spaceAfter=0):
         self.width = self._origWidth = width
-        self.height = height
+        self.height = lineWidth
+        self.lineWidth = lineWidth
         self.spaceBefore = spaceBefore
         self.spaceAfter = spaceAfter
 
@@ -859,9 +864,8 @@ class Rule(Flowable):
         from reportlab.lib.colors import black
         self.canv.saveState()
         self.canv.setStrokeColor(black)
-        self.canv.setLineWidth(self.height)
-        y = -self.height / 2
-        self.canv.line(0, y, self.width, y)
+        self.canv.setLineWidth(self.lineWidth)
+        self.canv.line(0, 0, self.width, 0)
         self.canv.restoreState()
 
 # Fix bugs in KeepTogether -- it merges adjacent space when calculating the
@@ -870,29 +874,66 @@ class Rule(Flowable):
 
 import reportlab.platypus.flowables as _pf
 import reportlab.platypus.doctemplate as _dt
+from reportlab.rl_config import _FUZZ
 
 class KeepTogether(_pf.KeepTogether):
 
     def wrap(self, aW, aH):
         dims = []
-        W,H = _pf._listWrapOn(self._content,aW,self.canv,mergeSpace=0,dims=dims)
-        self._H = H
+        W, H = _listWrapOn(self._content, aW, self.canv, mergeSpace=0,
+                           dims=dims)
+        self._H = self.wrapHeight = H
         self._H0 = dims and dims[0][1] or 0
-        self._wrapInfo = aW,aH
-        return W, 0xffffff  # force a split
+        self._wrapInfo = aW, aH
+        # Force a split, so that KeepTogether.draw() is never called (which we
+        # don't implement).
+        return W, 0xfffffff
 
     def split(self, aW, aH):
-        if getattr(self,'_wrapInfo',None)!=(aW,aH): self.wrap(aW,aH)
+        if getattr(self, '_wrapInfo', None) != (aW, aH):
+            self.wrap(aW, aH)
         S = self._content[:]
-        C0 = self._H > aH and self._maxHeight and aH < self._maxHeight
+        C0 = self._H > aH
+        C2 = self._maxHeight and aH > self._maxHeight
         C1 = self._H0 > aH
-        if C0 or C1:
-            if C0:
-                A = _dt.FrameBreak
-            else:
-                A = NullActionFlowable
-            S.insert(0,A())
+        if (C0 and not C2) or C1:
+            A = _dt.FrameBreak
+        else:
+            # Prevent the logic in BaseDocTemplate.handle_flowable() from
+            # raising a LayoutException.  Instead, it will insert our contents
+            # at the top of the flowable list and iterate.
+            A = NullActionFlowable
+        S.insert(0, A())
         return S
+
+def _listWrapOn(flowables, availWidth, canv, mergeSpace=True, dims=None):
+    '''return max width, required height for a list of flowables'''
+    W = 0
+    H = 0
+    pS = 0
+    atTop = True
+    for f in flowables:
+        if hasattr(f, 'frameAction'):
+            continue
+        w, h = f.wrapOn(canv, availWidth, 0xfffffff)
+        if h == 0xfffffff and hasattr(f, 'wrapHeight'):
+            h = f.wrapHeight
+        if dims is not None:
+            dims.append((w, h))
+        if w <= _FUZZ or h <= _FUZZ:
+            continue
+        W = max(W, w)
+        H += h
+        if not atTop:
+            h = f.getSpaceBefore()
+            if mergeSpace:
+                h = max(h - pS, 0)
+            H += h
+        else:
+            atTop = False
+        pS = f.getSpaceAfter()
+        H += pS
+    return W, H - pS
 
 class NullActionFlowable(_dt.NullActionFlowable):
     def apply(self, doc):
