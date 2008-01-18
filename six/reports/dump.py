@@ -40,66 +40,10 @@ def report_dump(options, model, predicate, local):
     # predicate.
     itemiser = Itemiser()
     itemiser.update(model.nodes(is_other(instance_p(NamedNode) & predicate)))
-    # Add nodes that are implied by the predicate:
-    # - A selected person implies the family they belong to.
-    for node in list(itemiser):
-        itemiser.update(node.nodes(outgoing & is_link(Belongs_to)))
-    # - A selected department imples its parent company (but not intermediate
-    #   departments).
-    for node in list(itemiser):
-        if isinstance(node, Department):
-            itemiser.update(n for n in node.all_parents()
-                                  if isinstance(n, Company))
-    # - A family implies all its members, and an organisation (company or
-    #   department) implies all the people who work for it.
-    for node in list(itemiser):
-        itemiser.update(node.nodes(incoming &
-                                 (is_link(Belongs_to) | is_link(Works_at))))
     # These sets control where entries are listed.
     seen = set(itemiser)
     see_in = defaultdict(set)
     alias = dict()
-    # Departments, whether selected or not, are always listed within the entry
-    # of the company to which they belong.  So any other entries to such
-    # departments must be in the form of a reference to the company.  So we
-    # mark them as "seen" except for the company in which they must appear.
-    # Departments that are included in the top-level listing must be replaced
-    # by an alias to the company in which they will be listed.
-    for node in list(itemiser):
-        if isinstance(node, Organisation):
-            depts = list(node.nodes(outgoing & is_link(Has_department)))
-            for dept in depts:
-                if dept in seen:
-                    itemiser.discard(dept)
-                    alias[dept] = node
-            seen.update(depts)
-            see_in[node].update(depts)
-    # Remove top-level entries for certain people.
-    for node in seen:
-        if isinstance(node, Person):
-            person = node
-            # People who are heads of organisations keep their own entry.
-            works_at = list(person.links(outgoing & is_link(Works_at)))
-            if [wat for wat in works_at if wat.is_head]:
-                continue
-            # Omit top-level entries for people who belong to a single family
-            # or who work for a single organisation, if the family/org has its
-            # own top-level entry.  Instead, their details will get listed
-            # within that entry.  The names of heads of families get turned
-            # into aliases for the family.
-            belongs_to = list(person.links(outgoing & is_link(Belongs_to)))
-            if len(belongs_to) == 1 and belongs_to[0].family in itemiser:
-                itemiser.discard(person)
-                see_in[belongs_to[0].family].add(person)
-                if belongs_to[0].is_head:
-                    alias[person] = belongs_to[0].family
-            elif len(works_at) == 1:
-                orgs = [org for org in chain([works_at[0].org],
-                                             works_at[0].org.all_parents())
-                                    if org in itemiser]
-                itemiser.discard(person)
-                for org in orgs:
-                    see_in[org].add(person)
     # Form the sorted index of all the top-level entries in the report.
     toplevel = sorted(chain(itemiser.items(),
                             itemiser.alias_items(alias.iteritems())))
