@@ -20,9 +20,7 @@ import six.parse as parse
 from six.test import run_doctest
 from six.input import InputError
 from six.model import Model, ModelParser
-from six.node import name_imatches, in_place
-from six.links import from_node
-from six.keyword import keyed_with
+from six.expr import parse_predicate, ExprError
 from six.reports.dump import report_dump, report_dump_getopt
 from six.reports.book import report_book, report_book_getopt
 from six.reports.email import report_email, report_email_getopt
@@ -50,6 +48,7 @@ def main():
     op.add_option('-o', '--output',
                   action='store', type='string', dest='output_path',
                   help='write output to file pathname instead of stdout')
+    op.disable_interspersed_args()
     try:
         # Parse the first argument(s) as the report type option.  If absent,
         # select the default report.
@@ -83,8 +82,7 @@ def main():
         # cache.
         model = None
         if (    os.path.exists(cache) and
-                (os.stat(path).st_mtime <= os.stat(cache).st_mtime) and
-                (os.stat(sys.argv[0]).st_mtime <= os.stat(cache).st_mtime)):
+                (os.stat(path).st_mtime <= os.stat(cache).st_mtime)):
             try:
                 model = pickle.load(file(cache, 'r'))
             except StandardError:
@@ -124,30 +122,16 @@ def main():
                 raise EnvError(e, var='SIX_LOCAL')
         # Parse command-line args as search expression.  If no args, then
         # select all nodes.
-        pred = None
-        if len(args):
-            for arg in args:
-                if arg.startswith('='):
-                    try:
-                        kw = model.keyword(arg[1:])
-                    except LookupError:
-                        raise ArgError('no such keyword', arg=arg)
-                    p = keyed_with(kw)
-                elif arg.startswith('in:'):
-                    try:
-                        place = model.lookup_place(arg[3:])
-                    except LookupError, e:
-                        raise ArgError(e, arg=arg[3:])
-                    p = in_place(place)
-                else:
-                    p = name_imatches(arg.decode(enc))
-                if pred is None:
-                    pred = p
-                else:
-                    pred = pred & p
+        if args:
+            try:
+                pred = parse_predicate(model, [arg.decode(enc) for arg in args])
+            except ExprError, e:
+                raise ArgError(e)
+        else:
+            pred = None
         # Print the selected report.
         report(options, model, pred, local)
-    except InputError, e:
+    except (InvocationError, InputError), e:
         print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]), str(e))
         sys.exit(1)
 
@@ -171,30 +155,33 @@ def opt_doctest(option, opt_str, value, parser):
             status = 1
     sys.exit(status)
 
-class ArgError(InputError):
+class InvocationError(StandardError):
+    pass
+
+class ArgError(InvocationError):
 
     def __init__(self, msg, arg=None):
-        StandardError.__init__(self, msg)
+        InvocationError.__init__(self, msg)
         self.arg = arg
 
     def __str__(self):
         r = []
         if self.arg is not None:
             r.append(repr(self.arg))
-        r.append(StandardError.__str__(self))
+        r.append(InvocationError.__str__(self))
         return ': '.join(r)
 
-class EnvError(InputError):
+class EnvError(InvocationError):
 
     def __init__(self, msg, var=None):
-        StandardError.__init__(self, msg)
+        InvocationError.__init__(self, msg)
         self.var = var
 
     def __str__(self):
         r = []
         if self.var is not None:
             r.append('env var %s' % self.var)
-        r.append(StandardError.__str__(self))
+        r.append(InvocationError.__str__(self))
         return ': '.join(r)
 
 if __name__ == '__main__':
