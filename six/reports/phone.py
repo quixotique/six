@@ -118,11 +118,11 @@ def telephones_qual(tup, tree, **kwargs):
             dept = None
             if isinstance(node, Resides_at):
                 qual = qual_home
-                comment.append(node.residence.lines[0])
+                comment.append(unicode(node.residence.lines[0]))
             elif isinstance(node, Works_at):
                 qual = qual_work
                 if node.position and node is tup[-1]:
-                    comment.append(node.position)
+                    comment.append(unicode(node.position))
                 comment.append(unicode(node.org))
                 if isinstance(node.org, Department):
                     dept = node.org
