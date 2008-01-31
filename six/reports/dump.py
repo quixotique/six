@@ -139,6 +139,7 @@ def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
         tree.nl()
     telephones(per, tree)
     dump_email(per, tree)
+    dump_postal(per, tree)
     dump_residences(per, tree)
     # Avoid endless recursion in dump_family() and dump_organisation().
     seen = seen | set([per])
@@ -177,6 +178,7 @@ def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
             dump_comments(link, sub)
             telephones(link, sub)
             dump_email(link, sub)
+            dump_postal(link, sub)
             if not refonly:
                 dump_organisation(link.org, sub, seen,
                                   show_workers=False, show_data=False)
@@ -190,6 +192,7 @@ def dump_family(fam, tree, seen=frozenset(), show_members=True, show_data=True):
     dump_residences(fam, tree)
     telephones(fam, tree)
     dump_email(fam, tree)
+    dump_postal(fam, tree)
     if show_data:
         dump_data(fam, tree)
     if show_members:
@@ -222,6 +225,7 @@ def dump_organisation(org, tree, seen=frozenset(), show_workers=True,
     dump_comments(org, tree)
     telephones(org, tree)
     dump_email(org, tree)
+    dump_postal(org, tree)
     dump_residences(org, tree)
     if show_workers:
         dump_works_at(org, tree, seen)
@@ -261,6 +265,7 @@ def dump_works_at(org, tree, seen):
         dump_comments(link, sub)
         telephones(link, sub)
         dump_email(link, sub)
+        dump_postal(link, sub)
         if not refonly:
             dump_person(link.person, sub, seen,
                         show_work=False, show_data=False)
@@ -317,6 +322,14 @@ def telephone(link, tree, qual=None, comment=None, bold=False):
     wrap_comments(link, tree)
     if comment:
         tree.wrap(' -- ', comment)
+
+def dump_postal(who, tree):
+    for link in who.links(outgoing & is_link(Has_postal_address)):
+        tree.add(link.postal)
+        tree.nl()
+        sub = tree.sub()
+        dump_comments(link, sub)
+        dump_comments(link.postal, sub)
 
 def dump_residences(who, tree):
     for link in who.links(outgoing & is_link(Resides_at)):

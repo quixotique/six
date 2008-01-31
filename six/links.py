@@ -97,9 +97,9 @@ class Has_postal_address(Link):
     def __init__(self, who, postal, timestamp=None):
         from six.person import Person
         from six.family import Family
-        from six.org import Organisation
+        from six.org import Organisation, Works_at
         from six.address import PostalAddress
-        assert isinstance(who, (Person, Family, Organisation))
+        assert isinstance(who, (Person, Family, Organisation, Works_at))
         assert isinstance(postal, PostalAddress)
         super(Has_postal_address, self).__init__(who, postal, timestamp=timestamp)
         self.who = who

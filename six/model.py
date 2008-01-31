@@ -698,6 +698,7 @@ class ModelParser(object):
     def parse_contacts_work(self, part, who):
         r'''Parse work-only contact details.
         '''
+        self.parse_con(part, who, 'pow', PostalAddress, Has_postal_address)
         self.parse_con(part, who, 'mobw', Telephone, Has_mobile_work)
         self.parse_con(part, who, 'phw', Telephone, Has_fixed_work)
         self.parse_con(part, who, 'faxw', Telephone, Has_fax_work)
@@ -766,6 +767,8 @@ class ModelParser(object):
         r'''Callback to pass to parse_assoc(), which parses contact details
         for a person-organisation Works_at association.
         '''
+        self.parse_con(part, ass, 'po', PostalAddress, Has_postal_address)
+        self.parse_con(part, ass, 'pow', PostalAddress, Has_postal_address)
         self.parse_con(part, ass, 'mobw', Telephone, Has_mobile_work)
         self.parse_con(part, ass, 'phw', Telephone, Has_fixed_work)
         self.parse_con(part, ass, 'faxw', Telephone, Has_fax_work)

@@ -714,11 +714,15 @@ class Booklet(object):
                     kwargs.iterkeys().next())
         contacts = []
         for node in filter(bool, nodes):
-            for typ in Has_mobile, Has_fixed, Has_fax, Has_email:
+            for typ in (Has_postal_address,
+                        Has_mobile, Has_fixed, Has_fax,
+                        Has_email):
                 for link in node.links(outgoing & is_link(typ)):
                     self._is_not_empty()
                     label = ''
-                    if isinstance(link, Has_email):
+                    if isinstance(link, Has_postal_address):
+                        self.add_address(link, link.postal)
+                    elif isinstance(link, Has_email):
                         bullet = EMAIL_BULLET
                         cnode = link.email
                         contact = escape_xml(str(cnode).replace(u' ', NBSP))
@@ -772,9 +776,8 @@ class Booklet(object):
         self._para(u' '.join(contacts), contacts_style)
 
     def add_addresses(self, who):
-        for typ in Resides_at, Has_postal_address:
-            for link in who.links(outgoing & is_link(typ)):
-                self.add_address(link, link.node2)
+        for link in who.links(outgoing & is_link(Resides_at)):
+            self.add_address(link, link.residence)
 
     def add_address(self, link, addr, prefix=''):
         self._is_not_empty()
