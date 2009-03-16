@@ -29,7 +29,7 @@ from six.reports.phone import report_phone, report_phone_getopt
 def main():
     locale.setlocale(locale.LC_ALL, '')
     lang, enc = locale.getlocale()
-    path = os.path.join(os.environ['HOME'], 'me', 'contacts', 'nlist')
+    path = os.path.join(os.environ['HOME'], 'vault', 'contacts', 'nlist')
     cache = os.path.join(os.path.dirname(path),
                          '.six-cache-' + os.path.basename(path))
     reports = dict([(name[7:], (obj, globals().get(name + '_getopt')))
