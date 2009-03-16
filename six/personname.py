@@ -144,6 +144,17 @@ class PersonName(object):
         return None
 
     @name_method
+    def initials(self):
+        r'''The full initials of the person, each followed by a single period,
+        with no intervening spaces.  These are generally the first letters of
+        all names except family names.  In English speaking countries, these
+        are the first and middle names.  Some names with apostrophes, like
+        "O'Grady" are represented as "O'G." instead of just "O.".
+        @raise ValueError: if no initials are known
+        '''
+        return None
+
+    @name_method
     def casual_name(self):
         r'''The name of the person in a casual context.  This is their full
         name, omitting any words that are normally omitted, and using any
@@ -284,6 +295,7 @@ class EnglishSpanishName(PersonName):
         Legal name                  y     [y]      y      [y]
         Full name                   yi     -       y      [y]
         Familiar name              sy      -       -       -
+        Initials                    I     [I]      -       -
         Casual name                sy      -       y       -
         Title name                 -       -       y      [y]
         Collation name            [yi]    [yi]     y      [y]
@@ -301,8 +313,11 @@ class EnglishSpanishName(PersonName):
           otherwise fail.  Initials not used.
      yi   If the given/middle name is not known in these cases, then initials
           are used, if known, otherwise fails.
+     I    The initials, if known, otherwise initials formed from the first
+          letter(s) of all word(s), if known, otherwise fails.
     [y]   The usual name if known.
     [yi]  Same as yi, but no failure if neither is known.
+    [I]   Same as I, but no failure if neither is known.
     [s]   Same as s, but no failure if neither is known.
     [ysi] The usual name if known, otherwise the short name if known, otherwise
           the initial if known.
@@ -324,6 +339,8 @@ class EnglishSpanishName(PersonName):
         'Zacharias Quaid Smith'
         >>> n.full_name()
         'Zacharias Smith'
+        >>> n.initials()
+        'Z.Q.'
         >>> n.casual_name()
         'Zack Smith'
         >>> n.familiar_name()
@@ -383,6 +400,8 @@ class EnglishSpanishName(PersonName):
         ValueError: no legal name for Z. Q. Smith
         >>> n.full_name()
         'Z. Smith'
+        >>> n.initials()
+        'Z.Q.'
         >>> n.casual_name()
         Traceback (most recent call last):
         ValueError: no casual name for Z. Q. Smith
@@ -421,6 +440,8 @@ class EnglishSpanishName(PersonName):
         >>> n.full_name()
         Traceback (most recent call last):
         ValueError: no full name for Zacharias [Zack]
+        >>> n.initials()
+        'Z.'
         >>> n.casual_name()
         Traceback (most recent call last):
         ValueError: no casual name for Zacharias [Zack]
@@ -612,6 +633,29 @@ class EnglishSpanishName(PersonName):
         return self.short or self.given
 
     @name_method
+    def initials(self):
+        r = []
+        if self.giveni:
+            r.append(self.giveni)
+        elif self.given:
+            r.extend(self.extract_initials(self.given))
+        if r:
+            if self.middlei:
+                r.append(self.middlei)
+            elif self.middle:
+                r.extend(self.extract_initials(self.middle))
+        return ''.join(r)
+
+    @classmethod
+    def extract_initials(cls, name):
+        for word in name.split():
+            if word[0].isalpha():
+                if len(word) > 2 and word[1] == "'" and word[2].isalpha():
+                    yield word[:3].upper() + '.'
+                else:
+                    yield word[0].upper() + '.'
+
+    @name_method
     def casual_name(self):
         return ' '.join([self.short or self.given, self.family])
 
@@ -683,6 +727,10 @@ class SingleName(PersonName):
     @name_method
     def full_name(self):
         return self.single
+
+    @name_method
+    def initials(self):
+        return ''.join(EnglishSpanishName.extract_initials(self.single))
 
     @name_method
     def casual_name(self):
@@ -767,6 +815,10 @@ class NameWrapper(PersonName):
 
     @defer_to_wrapped
     def full_name(self):
+        return None
+
+    @defer_to_wrapped
+    def initials(self):
         return None
 
     @defer_to_wrapped
