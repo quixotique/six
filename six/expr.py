@@ -83,10 +83,14 @@ class Predicate_Parser(object):
 
     def _term(self, token):
         if token.startswith('='):
+            kwstr = token[1:]
             try:
-                kw = self.model.keyword(token[1:])
+                kwstr = kwstr.encode('ascii')
+                kw = self.model.keyword(kwstr)
+            except UnicodeEncodeError:
+                raise ExprError('invalid keyword %r' % kwstr)
             except LookupError:
-                raise ExprError('no such keyword %r' % kw)
+                raise ExprError('no such keyword %r' % kwstr)
             return keyed_with(kw)
         elif token.startswith('in:'):
             try:
