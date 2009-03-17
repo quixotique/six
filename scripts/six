@@ -29,12 +29,12 @@ from six.reports.phone import report_phone, report_phone_getopt
 def main():
     locale.setlocale(locale.LC_ALL, '')
     lang, enc = locale.getlocale()
-    path = os.path.join(os.environ['HOME'], 'vault', 'contacts', 'nlist')
-    cache = os.path.join(os.path.dirname(path),
-                         '.six-cache-' + os.path.basename(path))
+    # Form list of reports from the available global functions whose names
+    # start with "report_".
     reports = dict([(name[7:], (obj, globals().get(name + '_getopt')))
                             for name, obj in globals().iteritems()
                             if callable(obj) and name.startswith('report_')])
+    # Must be at least one report defined.
     assert reports
     op = OptionParser(usage=
         'Usage: %prog --doctest [doctest-options] [module ...]\n'
@@ -76,13 +76,23 @@ def main():
             getopt(op)
         # Parse the command-line options.
         options, args = op.parse_args(args)
+        # Look for the source data file, and form the cache pathname from its
+        # path.
+        try:
+            srcpath = os.environ['SIX_SOURCE']
+        except LookupError, e:
+            raise EnvError('missing', var='SIX_SOURCE')
+        if not os.path.isfile(srcpath):
+            raise EnvError('file missing', var='SIX_SOURCE')
+        cache = os.path.join(os.path.dirname(srcpath),
+                             '.six-cache-' + os.path.basename(srcpath))
         # If the cache exists, attempt to read the model from it.  In the event
         # that it fails to read correctly, silently skip it and proceed to
         # compile the model from source, then save the compiled model in the
         # cache.
         model = None
         if (    os.path.exists(cache) and
-                (os.stat(path).st_mtime <= os.stat(cache).st_mtime)):
+                (os.stat(srcpath).st_mtime <= os.stat(cache).st_mtime)):
             try:
                 model = pickle.load(file(cache, 'r'))
             except StandardError:
@@ -91,9 +101,12 @@ def main():
             model = Model()
             parser = ModelParser(model)
             try:
-                for block in parse.blocks(parse.remove_comments(parse.lines(path))):
+                for block in parse.blocks(parse.remove_comments(parse.lines(srcpath))):
                     parser.parse_block(block)
                 parser.finish_parsing()
+            except IOError, e:
+                raise InputError('error parsing source file: %s' % (e,),
+                                 path=srcpath)
             finally:
                 parser.finalise()
             try:
@@ -119,7 +132,7 @@ def main():
             try:
                 local = model.lookup_place(os.environ['SIX_LOCAL'])
             except LookupError, e:
-                raise EnvError(e, var='SIX_LOCAL')
+                raise EnvError('missing', var='SIX_LOCAL')
         # Parse command-line args as search expression.  If no args, then
         # select all nodes.
         if args:
@@ -181,6 +194,10 @@ class EnvError(InvocationError):
         r = []
         if self.var is not None:
             r.append('env var %s' % self.var)
+            try:
+                r[-1] += '=%r' % os.environ[self.var]
+            except KeyError:
+                pass
         r.append(InvocationError.__str__(self))
         return ': '.join(r)
 
