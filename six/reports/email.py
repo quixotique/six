@@ -1,6 +1,6 @@
 # vim: sw=4 sts=4 et fileencoding=latin1 nomod
 
-r'''Booklet report.
+r'''Email address report.
 '''
 
 import locale
