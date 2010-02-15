@@ -53,15 +53,15 @@ class multilang(object):
             >>> t = multilang(en='Spain', es=u'España')
             >>> loc = locale.getlocale(locale.LC_MESSAGES)
             >>> try:
-            ...     locale.setlocale(locale.LC_MESSAGES, 'en_AU')
+            ...     locale.setlocale(locale.LC_MESSAGES, 'en_AU.utf8')
             ...     unicode(t)
-            ...     locale.setlocale(locale.LC_MESSAGES, 'es_ES')
+            ...     locale.setlocale(locale.LC_MESSAGES, 'es_ES.utf8')
             ...     unicode(t)
             ... finally:
             ...     dum = locale.setlocale(locale.LC_MESSAGES, loc)
-            'en_AU'
+            'en_AU.utf8'
             u'Spain'
-            'es_ES'
+            'es_ES.utf8'
             u'Espa\xf1a'
 
         '''
@@ -75,14 +75,14 @@ class multilang(object):
             >>> t = multilang(en='Spain', es=u'España')
             >>> loc = locale.getlocale(locale.LC_MESSAGES)
             >>> try:
-            ...     locale.setlocale(locale.LC_MESSAGES, 'en_AU')
+            ...     locale.setlocale(locale.LC_MESSAGES, 'en_AU.utf8')
             ...     str(t)
             ... finally:
             ...     dum = locale.setlocale(locale.LC_MESSAGES, loc)
-            'en_AU'
+            'en_AU.utf8'
             'Spain'
             >>> try:
-            ...     locale.setlocale(locale.LC_MESSAGES, 'es_ES')
+            ...     locale.setlocale(locale.LC_MESSAGES, 'es_ES.utf8')
             ...     str(t)
             ... finally:
             ...     dum = locale.setlocale(locale.LC_MESSAGES, loc)
