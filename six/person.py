@@ -122,9 +122,14 @@ class Person(NamedNode):
         r'''Return the person's name as used in forming an email address.
         '''
         try:
+            return self.name.casual_name()
+        except ValueError:
+            pass
+        try:
             return self.name.full_name()
         except ValueError:
-            return self.name.complete_name()
+            pass
+        return self.name.complete_name()
 
     def full_name_known(self):
         r'''Used when ordering the heads of a family -- those whose full names
