@@ -1,6 +1,6 @@
 # vim: sw=4 sts=4 et fileencoding=latin1 nomod
 
-r'''Booklet report.
+r'''Phone numbers report.
 '''
 
 import locale
@@ -43,6 +43,10 @@ def report_phone(options, model, predicate, local):
         sub = tree.sub()
         if isinstance(node, Person):
             tree.add(node, underline=True)
+            for aka in node.aka:
+                tree.add(' (')
+                tree.add(aka)
+                tree.add(')')
             tree.nl()
             dump_comments(node, sub)
             telephones(node, sub, **tkw)
