@@ -63,7 +63,9 @@ def report_email(options, model, predicate, local):
 
 def print_emails(node, encoding):
     name = None
-    if isinstance(node, NamedNode):
+    if isinstance(node, Person):
+        name = node.email_address_name()
+    elif isinstance(node, NamedNode):
         name = unicode(node)
     elif isinstance(node, Link):
         if hasattr(node, 'person'):
