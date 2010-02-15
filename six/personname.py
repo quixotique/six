@@ -116,6 +116,7 @@ class PersonName(object):
         personal use, such as an address book.  This only succeeds if any
         contracted names (ie, short forms or nicknames) are known.  It does not
         contain initials.
+        @raise ValueError: if no contracted names are known
         '''
         return None
 
