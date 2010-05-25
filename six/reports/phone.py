@@ -82,6 +82,10 @@ def report_phone(options, model, predicate, local):
                 link = node.link(incoming & is_link(Has_department))
                 if link:
                     tree.add(', ', link.company)
+            for aka in node.aka:
+                tree.add(' (')
+                tree.add(aka)
+                tree.add(')')
             tree.nl()
             dump_comments(node, sub)
             telephones(node, sub, **tkw)
