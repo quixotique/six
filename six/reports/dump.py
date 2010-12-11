@@ -342,25 +342,38 @@ def dump_residences(who, tree):
         telephones(link.residence, sub)
 
 def dump_data(who, tree):
+    others = {}
     for link in who.links(is_link(With) | (outgoing & is_link(Is_in))):
-        position = getattr(link, 'position', None)
         other = link.other(who)
+        position = getattr(link, 'position', None)
+        key = (isinstance(link, Is_in), other, position)
+        if key not in others:
+            others[key] = []
+        others[key].append(link)
+    keys = others.keys()
+    keys.sort(key=lambda k: (not k[0], unicode(k[1]), unicode(k[2])))
+    for key in keys:
+        (is_in, other, position) = key
+        links = others[key]
         tree.add('* ')
+        if is_in:
+            tree.add('in ')
         if position and isinstance(other, Organisation):
             tree.add(position, ', ')
             position = None
-        if isinstance(link, Is_in):
-            tree.add('in ')
         tree.add(other)
         if position:
             tree.add(', ', position)
         tree.nl()
-        sub = tree.sub()
-        dump_comments(link, sub)
-        for data in link.nodes(incoming & is_link(Has_context)):
-            sub.add(data)
-            sub.nl()
-            dump_comments(data, sub.sub())
+        for link in links:
+            sub = tree.sub()
+            dump_comments(link, sub)
+            data = list(link.nodes(incoming & is_link(Has_context)))
+            data.sort(key=unicode)
+            for datum in data:
+                sub.add(datum)
+                sub.nl()
+                dump_comments(datum, sub.sub())
 
 def dump_comments(node, tree):
     for com in node.nodes(outgoing & is_link(Has_comment)):

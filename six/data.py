@@ -70,8 +70,7 @@ class Data_factory_place(object):
             part.place != self._place):
             raise InputError('invalid data place %s - should be %s' %
                              (part.place, self._place), line=value)
-        context = who.link(outgoing & is_link(Is_in) &
-                           only_in_place(self._place))
+        context = who.link(is_in_place(self._place))
         if not context:
             context = Is_in(who, self._place)
         return Data(context, id, value, timestamp=part.updated)
@@ -103,8 +102,7 @@ class Data_factory_context(object):
             if not place:
                 raise InputError('data context (place) unknown',
                                  line=value)
-            is_in = context.link(outgoing & is_link(Is_in) &
-                                 only_in_place(place))
+            is_in = context.link(is_in_place(place))
             if not is_in:
                 is_in = Is_in(context, place)
             context = is_in

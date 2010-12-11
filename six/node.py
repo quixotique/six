@@ -13,7 +13,7 @@ __all__ = [
         'incoming', 'outgoing', 'is_other', 'is_link',
         'instance_p', 'type_p',
         'from_node', 'to_node',
-        'only_in_place', 'in_place', 'test_attr',
+        'in_place', 'test_attr',
         'name_imatches',
     ]
 
@@ -612,11 +612,6 @@ def to_node(node):
     if isinstance(node, node_predicate):
         return link_predicate(lambda link: node(link.node2))
     raise ValueError('to_node(%r): invalid argument' % node)
-
-def only_in_place(place):
-    r'''Return a node predicate that selects nodes with the given only place.
-    '''
-    return node_predicate(lambda node: node.only_place() == place)
 
 def in_place(place):
     r'''Return a node predicate that selects nodes that are in a given place.

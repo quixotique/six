@@ -4,10 +4,11 @@ r'''Data model - Link subclasses.
 '''
 
 from six.node import *
+from six.node import link_predicate
 from six.multilang import multilang
 
 __all__ = [
-        'Is_in',
+        'Is_in', 'is_in_place',
         'Belongs_to',
         'Resides_at', 'Has_postal_address',
         'Association', 'With', 'Ex',
@@ -32,6 +33,11 @@ class Is_in(Link):
 
     def only_place(self):
         return self.where
+
+def is_in_place(place):
+    r'''Return a link predicate that selects Is_in nodes for a given place.
+    '''
+    return is_link(Is_in) & link_predicate(lambda link: link.where == place)
 
 class Belongs_to(Link):
 
