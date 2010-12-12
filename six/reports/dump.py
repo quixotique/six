@@ -267,8 +267,8 @@ def dump_works_at(org, tree, seen):
         dump_email(link, sub)
         dump_postal(link, sub)
         if not refonly:
-            dump_person(link.person, sub, seen,
-                        show_work=False, show_data=False)
+            dump_person(link.person, sub, seen, show_work=False, show_data=False)
+        dump_data(link, sub)
 
 def dump_email(who, tree):
     for link in who.links(outgoing & is_link(Has_email)):
@@ -345,25 +345,37 @@ def dump_data(who, tree):
     others = {}
     for link in who.links(is_link(With) | (outgoing & is_link(Is_in))):
         other = link.other(who)
+        agent = None
+        if isinstance(other, Works_at):
+            agent = other.person, other.position
+            other = other.org
         position = getattr(link, 'position', None)
-        key = (isinstance(link, Is_in), other, position)
+        key = (isinstance(link, Is_in), other, position, agent)
         if key not in others:
             others[key] = []
         others[key].append(link)
     keys = others.keys()
     keys.sort(key=lambda k: (not k[0], unicode(k[1]), unicode(k[2])))
     for key in keys:
-        (is_in, other, position) = key
+        (is_in, other, position, agent) = key
         links = others[key]
         tree.add('* ')
-        if is_in:
-            tree.add('in ')
         if position and isinstance(other, Organisation):
             tree.add(position, ', ')
             position = None
+        if is_in:
+            tree.add('in ')
         tree.add(other)
         if position:
             tree.add(', ', position)
+        if agent:
+            person, position = agent
+            tree.add(' (')
+            sub.add(person)
+            if position:
+                sub.add(", ")
+                sub.add(position)
+            tree.add(')')
         tree.nl()
         for link in links:
             sub = tree.sub()

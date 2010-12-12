@@ -543,10 +543,8 @@ class ModelParser(object):
         # context provided by residence and phone numbers already parsed.
         self.parse_con(part, org, 'com', Comment, Has_comment)
         self.parse_data(part, org)
-        self.parse_assoc(part, org, 'with', NamedNode, With,
-                         self.parse_assoc_contacts)
-        self.parse_assoc(part, org, 'ex', NamedNode, Ex,
-                         self.parse_assoc_contacts)
+        self.parse_assoc(part, org, 'with', NamedNode, With, self.parse_assoc_contacts)
+        self.parse_assoc(part, org, 'ex', NamedNode, Ex, self.parse_assoc_contacts)
         self.parse_keywords(part, org)
         # Parse any 'in' sub-parts.
         for sub in (s for v, s in part.mget('in', []) if s):
@@ -581,10 +579,8 @@ class ModelParser(object):
         self.parse_con(part, fam, 'www', URI, Has_web_page)
         self.parse_con(part, fam, 'com', Comment, Has_comment)
         self.parse_data(part, fam)
-        self.parse_assoc(part, fam, 'with', NamedNode, With,
-                         self.parse_assoc_contacts)
-        self.parse_assoc(part, fam, 'ex', NamedNode, Ex,
-                         self.parse_assoc_contacts)
+        self.parse_assoc(part, fam, 'with', NamedNode, With, self.parse_assoc_contacts)
+        self.parse_assoc(part, fam, 'ex', NamedNode, Ex, self.parse_assoc_contacts)
         self.parse_keywords(part, fam)
         # Parse any 'in' sub-parts.
         for sub in (s for v, s in part.mget('in', []) if s):
@@ -777,6 +773,13 @@ class ModelParser(object):
         self.parse_con(part, ass, 'ph', Telephone, Has_fixed_work)
         self.parse_con(part, ass, 'fax', Telephone, Has_fax_work)
         self.parse_con(part, ass, 'em', Email, Has_email_work)
+        # Parse 'data' and keywords, which take advantage of the place context
+        # provided by residence and phone numbers already parsed.
+        self.parse_con(part, ass, 'com', Comment, Has_comment)
+        self.parse_data(part, ass)
+        self.parse_assoc(part, ass, 'with', NamedNode, With)
+        self.parse_assoc(part, ass, 'ex', NamedNode, Ex)
+        self.parse_keywords(part, ass)
 
     def parse_con(self, part, who, key, ntype, ltype):
         r'''Parse a contact line and attach it to a given node.
