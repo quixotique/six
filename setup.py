@@ -1,4 +1,4 @@
-#!/usr/local/stackless/bin/python2.5
+#!/usr/local/stackless-2.65/bin/python2.6
 # vim: sw=4 sts=4 et fileencoding=latin1 nomod
 
 from distutils.core import setup
