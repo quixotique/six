@@ -333,7 +333,7 @@ def dump_postal(who, tree):
 
 def dump_residences(who, tree):
     for link in who.links(outgoing & is_link(Resides_at)):
-        tree.add(link.residence)
+        tree.add(link.residence.relative(tree.local))
         tree.nl()
         sub = tree.sub()
         dump_comments(link, sub)

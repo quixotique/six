@@ -46,6 +46,36 @@ class Address(Node):
         return '%s(lines=%r, place=%r)' % (self.__class__.__name__,
                 self.lines, self.place)
 
+    def absolute(self):
+        return self.as_unicode(with_country=True)
+
+    def relative(self, place):
+        r'''
+            >>> au = Country('AU', 'en', '61', multilang('Australia'), aprefix='0', sprefix='1')
+            >>> sa = Area(au, '8', multilang('SA'), \
+            ...           multilang(en='South Australia', es='Australia Meridional'))
+            >>> es = Country('ES', 'es', '34', multilang('Spain'))
+            >>> w = World(countries=[au, es])
+
+            >>> a = Address(['50 Clifton St', 'Maylands SA 5069'], Place(sa))
+            >>> unicode(a)
+            u'50 Clifton St; Maylands SA 5069; AUSTRALIA'
+            >>> a.relative(Place(sa))
+            u'50 Clifton St; Maylands SA 5069'
+            >>> a.relative(Place(au))
+            u'50 Clifton St; Maylands SA 5069'
+            >>> a.relative(Place(es))
+            u'50 Clifton St; Maylands SA 5069; AUSTRALIA'
+
+        '''
+        country = None
+        if place is not None:
+            assert isinstance(place, Place)
+            country = place.country
+        if place and self.place.country is place.country:
+            return self.as_unicode(with_country=False)
+        return self.absolute()
+
     def __hash__(self):
         return hash(self.place) ^ hash(self.lines)
 
