@@ -926,11 +926,6 @@ class ModelParser(object):
         '''
         spl = text.split('=', 1)
         id = spl[0].rstrip()
-        try:
-            id = id.encode('ascii')
-        except UnicodeEncodeError:
-            raise InputError('data id %r contains non-ASCII character'
-                             % unicode(id), char=id)
         value = spl[1].lstrip() if len(spl) == 2 else None
         return id, value
 

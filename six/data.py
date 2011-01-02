@@ -15,12 +15,12 @@ __all__ = ['Data', 'Has_context',
 
 class Data(Node):
 
-    r'''An atom of contextual data consists of an ASCII ID string, and a value
+    r'''An atom of contextual data consists of a Unicode ID string, and a value
     string.  These, combined with the 'context' node to which the data is
     linked, uniquely identifies the atom.'''
 
     def __init__(self, context, id, value, timestamp=None):
-        assert isinstance(id, str)
+        assert isinstance(id, basestring)
         assert isinstance(value, basestring)
         super(Data, self).__init__()
         self.id = id
