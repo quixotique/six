@@ -6,15 +6,24 @@ r'''Data model - sorting.
 from six.node import *
 from six.text import *
 from six.uniq import uniq
+from six.enum import Enum
 
-__all__ = ['SortItem', 'Itemiser', 'cull_references']
+__all__ = ['SortMode', 'SortItem', 'Itemiser', 'cull_references']
+
+class SortMode(Enum('ALL_NAMES', 'FIRST_NAME', 'LAST_NAME')):
+    r'''When collating and sorting nodes, the sort keys at which each node
+    appears can be controlled using the optional 'sort_mode' parameter.
+    '''
+    pass
 
 class Itemiser(object):
     r'''An Itemiser is a set-like object to which nodes may be added, and
     SortItem objects retrieved, based on the nodes added to date.
     '''
 
-    def __init__(self):
+    def __init__(self, sort_mode=SortMode.ALL_NAMES):
+        assert isinstance(sort_mode, SortMode)
+        self.sort_mode = sort_mode
         self._nodes = set()
         self._items = None
 
@@ -72,7 +81,7 @@ class Itemiser(object):
         if self._items is None:
             self._items = dict()
             for node1 in self:
-                items = [SortItem(node1, key) for key in node1.sort_keys()]
+                items = [SortItem(node1, key) for key in node1.sort_keys(sort_mode=self.sort_mode)]
                 assert items
                 for item in items:
                     item.single = items[0]
@@ -92,7 +101,7 @@ class Itemiser(object):
         '''
         for src, dst in aliases:
             di = self.items(dst).next()
-            for key in src.sort_keys():
+            for key in src.sort_keys(sort_mode=self.sort_mode):
                 si = SortItem(dst, key)
                 si.single = di
                 yield si

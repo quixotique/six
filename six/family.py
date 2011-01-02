@@ -8,6 +8,7 @@ from six.node import *
 from six.person import Person
 from six.uniq import uniq_generator
 from six.multilang import *
+from six.sort import SortMode
 
 __all__ = ['Family']
 
@@ -21,7 +22,7 @@ class Family(NamedNode):
     the family, which correspond to the people with "+" delimiters.
     '''
 
-    def _name(self, first=None):
+    def _name(self, first=None, by_last_name=False):
         r'''Form the name of the family from the names of all the heads of
         family, in order.  If the 'first' argument is given, then place that
         person at the front of the name.
@@ -48,13 +49,19 @@ class Family(NamedNode):
                     tn = None
             if surname != tn:
                 if surname:
-                    r.append(surname)
+                    if by_last_name:
+                        r.insert(-1, surname + ', ')
+                    else:
+                        r.append(surname)
                 surname = tn
             if r:
                 r.append(' & ')
             r.append(hn)
         if surname:
-            r.append(surname)
+            if by_last_name:
+                r.insert(-1, surname + ', ')
+            else:
+                r.append(surname)
         return u''.join(r)
 
     def only_place(self):
@@ -94,24 +101,25 @@ class Family(NamedNode):
 
     @uniq_generator
     @expand_multilang_generator
-    def sort_keys(self):
+    def sort_keys(self, sort_mode):
         r'''Iterate over all the sort keys that this family can have.  This
         starts with the full name of the family formed from the names of all
         the heads, which is then permuted to start with each of the heads.
-        Then the collation name (if known) of each head.
+        Then the collation name (if known) of each head.  Finally any AKAs.
         '''
         for head in self.heads():
-            yield self._name(head)
-        coll = defaultdict(list)
-        for head in self.heads():
-            try:
-                cn = head.name.collation_name()
-                fn, gn = cn.split(', ')
-                coll[fn].append(gn)
-            except ValueError:
-                pass
-        for fn, gns in coll.iteritems():
-            yield fn + ', ' + ' & '.join(gns)
+            yield self._name(head, by_last_name = sort_mode is SortMode.LAST_NAME)
+        if sort_mode is SortMode.ALL_NAMES:
+            coll = defaultdict(list)
+            for head in self.heads():
+                try:
+                    cn = head.name.collation_name()
+                    fn, gn = cn.split(', ')
+                    coll[fn].append(gn)
+                except ValueError:
+                    pass
+            for fn, gns in coll.iteritems():
+                yield fn + ', ' + ' & '.join(gns)
         for aka in self.aka:
             yield aka
 

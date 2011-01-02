@@ -62,20 +62,34 @@ class Person(NamedNode):
 
     @uniq_generator
     @expand_multilang_generator
-    def sort_keys(self):
+    def sort_keys(self, sort_mode):
         r'''Iterate over all the sort keys that this person can have.
         '''
-        try:
-            yield self.name.informal_index_name()
-        except ValueError:
-            pass
-        yield self.name.formal_index_name()
-        try:
-            yield self.name.collation_name()
-        except ValueError:
-            pass
+        yielded = 0
+        if sort_mode is SortMode.LAST_NAME:
+            try:
+                yield self.name.collation_name()
+                yielded += 1
+            except ValueError:
+                pass
+        else:
+            try:
+                yield self.name.informal_index_name()
+                yielded += 1
+            except ValueError:
+                pass
+        if sort_mode is SortMode.ALL_NAMES or yielded == 0:
+            yield self.name.formal_index_name()
+            yielded += 1
+        if sort_mode is SortMode.ALL_NAMES:
+            try:
+                yield self.name.collation_name()
+                yielded += 1
+            except ValueError:
+                pass
         for aka in self.aka:
             yield aka
+            yielded += 1
 
     @uniq_generator
     def names(self, with_aka=True):

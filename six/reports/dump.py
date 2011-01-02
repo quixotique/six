@@ -24,21 +24,30 @@ from six.data import *
 from six.comment import *
 from six.uniq import uniq
 
+sort_modes = {'first': SortMode.FIRST_NAME,
+              'last':  SortMode.LAST_NAME,
+              'all':   SortMode.ALL_NAMES,}
+
 def report_dump_getopt(parser):
     lang, enc = locale.getlocale()
     parser.set_defaults(encoding=enc)
     parser.add_option('-e', '--encode',
                       action='store', type='string', dest='encoding',
                       help='use ENCODE as output encoding')
+    parser.add_option('-s', '--sort-mode', metavar='MODE',
+                      action='store', type='choice', dest='sort_mode',
+                      choices=sort_modes.keys(),
+                      help='use MODE as sort mode')
 
 def report_dump(options, model, predicate, local):
+    sort_mode = sort_modes.get(options.sort_mode, SortMode.FIRST_NAME)
     # If no predicate given, then select all people, organisations, and
     # families.
     if predicate is None:
         predicate = node_predicate(lambda node: True)
     # Populate the top level of the report with all the nodes that satisfy the
     # predicate.
-    itemiser = Itemiser()
+    itemiser = Itemiser(sort_mode)
     itemiser.update(model.nodes(is_other(instance_p(NamedNode) & predicate)))
     # These sets control where entries are listed.
     seen = set(itemiser)
@@ -51,7 +60,7 @@ def report_dump(options, model, predicate, local):
     cull_references(toplevel)
     # Now format the report.
     from six.output import Treebuf
-    tree = Treebuf(local=local)
+    tree = Treebuf(local=local, sort_mode=sort_mode)
     for item in toplevel:
         if item.node is None:
             pass
@@ -148,7 +157,7 @@ def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
             refonly = link.family in seen
             if refonly:
                 tree.add('-> ')
-                tree.add(link.family.sort_keys().next())
+                tree.add(link.family.sort_keys(tree.sort_mode).next())
             else:
                 tree.add('-- ')
                 add_name(link.family, tree, link)
@@ -170,7 +179,7 @@ def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
             if link.position:
                 tree.add(link.position, ', ')
             if refonly:
-                tree.add(link.org.sort_keys().next())
+                tree.add(link.org.sort_keys(tree.sort_mode).next())
             else:
                 add_name(link.org, tree, link)
             tree.nl()
@@ -202,7 +211,7 @@ def dump_family(fam, tree, seen=frozenset(), show_members=True, show_data=True):
                                           l.person.sortkey())):
             if link.person in seen:
                 tree.add('-> ')
-                tree.add(link.person.sort_keys().next())
+                tree.add(link.person.sort_keys(tree.sort_mode).next())
                 tree.nl()
                 sub = tree.sub()
                 dump_comments(link, sub)
@@ -235,7 +244,7 @@ def dump_organisation(org, tree, seen=frozenset(), show_workers=True,
         refonly = link.dept in seen
         if refonly:
             tree.add('-> ')
-            tree.add(link.dept.sort_keys().next())
+            tree.add(link.dept.sort_keys(tree.sort_mode).next())
             tree.nl()
         else:
             dump_names(link.dept, tree, link)
@@ -254,7 +263,7 @@ def dump_works_at(org, tree, seen):
         refonly = link.person in seen
         if refonly:
             tree.add('-> ')
-            tree.add(link.person.sort_keys().next())
+            tree.add(link.person.sort_keys(tree.sort_mode).next())
             if link.position:
                 tree.add(', ', link.position)
             tree.nl()

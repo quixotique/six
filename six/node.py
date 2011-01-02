@@ -658,7 +658,7 @@ class NamedNode(Node):
 
     @uniq_generator
     @expand_multilang_generator
-    def sort_keys(self):
+    def sort_keys(self, sort_mode):
         r'''The sort keys under which this node may be listed are all the names
         that this node has.  If any name is a multilang, then this expands it
         into all its languages.
