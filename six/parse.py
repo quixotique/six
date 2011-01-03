@@ -18,7 +18,7 @@ def lines(path):
     lnum = 1
     try:
         for line in codecs.open(path, 'r', encoding):
-            yield itext.new(line, loc=iloc(path=path, line=lnum, column=1))
+            yield itext(line, loc=iloc(path=path, line=lnum, column=1))
             lnum += 1
     except UnicodeDecodeError, e:
         raise InputError(e, loc=iloc(path=path, line=lnum))
@@ -430,10 +430,10 @@ class dataset_loc_memo(object):
     r'''A wrapper around a dataset that remembers all the values that have been
     fetched using the get(), mget(), getvalue(), and mgetvalue() methods.
     
-        >>> dc = dataset([('x', itext.new('8',8)), ('y', itext.new('9',9))], \
+        >>> dc = dataset([('x', itext('8',8)), ('y', itext('9',9))], \
         ...              loc=15)
-        >>> d = dataset([('a',itext.new('1',1)), ('b',itext.new('2',2)), \
-        ...              ('a',itext.new('3',3)), ('c',(itext.new('4',4),dc))], \
+        >>> d = dataset([('a',itext('1',1)), ('b',itext('2',2)), \
+        ...              ('a',itext('3',3)), ('c',(itext('4',4),dc))], \
         ...              loc=10)
         >>> m = dataset_loc_memo(d)
         >>> m.loc()
@@ -452,15 +452,15 @@ class dataset_loc_memo(object):
         Traceback (most recent call last):
         InputError: 3: duplicate 'a'
         >>> m.mget('a')
-        [(itext.new(u'1', loc=1), None), (itext.new(u'3', loc=3), None)]
+        [(itext(u'1', loc=1), None), (itext(u'3', loc=3), None)]
         >>> m.memo == set([1, 3])
         True
         >>> m.get('b')
-        (itext.new(u'2', loc=2), None)
+        (itext(u'2', loc=2), None)
         >>> m.memo == set([1, 2, 3])
         True
         >>> m.mget('b')
-        [(itext.new(u'2', loc=2), None)]
+        [(itext(u'2', loc=2), None)]
         >>> m.memo == set([1, 2, 3])
         True
         >>> m.get('d')
@@ -470,22 +470,22 @@ class dataset_loc_memo(object):
         Traceback (most recent call last):
         InputError: 3: duplicate 'a'
         >>> m.mgetvalue('a')
-        [itext.new(u'1', loc=1), itext.new(u'3', loc=3)]
+        [itext(u'1', loc=1), itext(u'3', loc=3)]
         >>> m.getvalue('b')
-        itext.new(u'2', loc=2)
+        itext(u'2', loc=2)
         >>> m.mgetvalue('b')
-        [itext.new(u'2', loc=2)]
+        [itext(u'2', loc=2)]
         >>> m.memo == set([1, 2, 3])
         True
         >>> m.getvalue('c')
         Traceback (most recent call last):
         InputError: spurious data
         >>> m.get('c')[0]
-        itext.new(u'4', loc=4)
+        itext(u'4', loc=4)
         >>> m.memo == set([1, 2, 3, 4])
         True
         >>> m.get('c')[1].getvalue('x')
-        itext.new(u'8', loc=8)
+        itext(u'8', loc=8)
         >>> m.memo == set([1, 2, 3, 4, 8])
         True
         >>> set(m.all_locs()) == set([1, 2, 3, 4, 8, 9])

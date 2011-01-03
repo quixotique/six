@@ -219,11 +219,11 @@ class multilang(object):
         produce this multilang.  If the multilang was not produced by parsing
         input, then return None.
 
-            >>> m = multilang.parse(itext.new('"abc"', loc=5))[1]
+            >>> m = multilang.parse(itext('"abc"', loc=5))[1]
             >>> m.loc()
             5
 
-            >>> m = multilang(itext.new('abc', loc=5))
+            >>> m = multilang(itext('abc', loc=5))
             >>> m.loc()
             5
 
@@ -260,7 +260,7 @@ class multilang(object):
             >>> multilang.parse(u'en:"Spain" es:"España" abc')
             (u'abc', multilang(en=u'Spain', es=u'Espa\xf1a'))
 
-            >>> multilang.parse(itext.new(u'en:"Spain" "España" abc', loc=iloc(column=1)))
+            >>> multilang.parse(itext(u'en:"Spain" "España" abc', loc=iloc(column=1)))
             Traceback (most recent call last):
             InputError: column 12: bare text mixed with language text
 

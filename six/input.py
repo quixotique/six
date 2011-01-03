@@ -17,9 +17,9 @@ class itext(unicode):
 
     r'''All input text is treated as Unicode.
 
-        >>> l = itext.new('abc\n', loc=50)
+        >>> l = itext('abc\n', loc=50)
         >>> l
-        itext.new(u'abc\n', loc=50)
+        itext(u'abc\n', loc=50)
         >>> str(l)
         'abc\n'
         >>> len(l)
@@ -28,22 +28,19 @@ class itext(unicode):
         50
     '''
 
-    @classmethod
-    def new(class_, text, loc=None):
+    def __new__(cls, text=u'', loc=None):
         r'''Since we're overriding the builtin L{unicode} class, we can't mess
-        with the constructor, so we use this class method to construct itext
-        instances.
+        with the constructor, so we use this special class method to construct
+        itext instances.
         @param text: any object that supports unicode(text)
         @param loc: either None or any object that supports integer addition
             and subtraction: loc +- int -> loc
         '''
-        line = class_(text)
-        line.__loc.append((0, len(line), loc))
-        return line
-
-    def __init__(self, text=u''):
-        unicode.__init__(self, text)
-        self.__loc = []
+        obj = super(itext, cls).__new__(cls, text)
+        obj.__loc = []
+        if loc is not None:
+            obj.__loc.append((0, len(obj), loc))
+        return obj
 
     def __reduce__(self):
         r'''We pickle ourselves to a unicode string.
@@ -54,12 +51,12 @@ class itext(unicode):
         r'''Return the location of the first "located" character in this
         string, or if the string has no location, then return None.
 
-            >>> a = itext.new('abc\n', loc=5)
+            >>> a = itext('abc\n', loc=5)
             >>> a.loc()
             5
             >>> b = u'...' + a
             >>> b
-            itext(u'...')+itext.new(u'abc\n', loc=5)
+            itext(u'...')+itext(u'abc\n', loc=5)
             >>> b.loc()
             5
             >>> b[0]
@@ -75,10 +72,10 @@ class itext(unicode):
         r'''The repr() of an L{itext} string is an expression which can be
         evaluated to create an identical string.
 
-            >>> a = itext.new('abc\n', loc=5)
+            >>> a = itext('abc\n', loc=5)
             >>> b = u'xyz' + a + u'def' + a + u'ghi'
             >>> b
-            itext(u'xyz')+itext.new(u'abc\n', loc=5)+itext(u'def')+itext.new(u'abc\n', loc=5)+itext(u'ghi')
+            itext(u'xyz')+itext(u'abc\n', loc=5)+itext(u'def')+itext(u'abc\n', loc=5)+itext(u'ghi')
             >>> b == eval(repr(b))
             True
         '''
@@ -90,7 +87,7 @@ class itext(unicode):
             if pos != start:
                 r.append('%s(%r)' % (classname,
                         unicode.__getslice__(self, pos, start)))
-            r.append('%s.new(%r, loc=%r)' % (classname,
+            r.append('%s(%r, loc=%r)' % (classname,
                      unicode.__getslice__(self, start, end), loc))
             pos = end
         assert pos <= len(self)
@@ -101,12 +98,12 @@ class itext(unicode):
 
     def __add__(self, text):
         r'''
-            >>> a = itext.new('abc\n', loc=2)
+            >>> a = itext('abc\n', loc=2)
             >>> b = a + u'def'
             >>> b
-            itext.new(u'abc\n', loc=2)+itext(u'def')
+            itext(u'abc\n', loc=2)+itext(u'def')
             >>> b[3]
-            itext.new(u'\n', loc=5)
+            itext(u'\n', loc=5)
             >>> b[4]
             itext(u'd')
         '''
@@ -121,14 +118,14 @@ class itext(unicode):
 
     def __radd__(self, text):
         r'''
-            >>> a = itext.new('def\n', loc=2)
+            >>> a = itext('def\n', loc=2)
             >>> b = u'abc' + a
             >>> b
-            itext(u'abc')+itext.new(u'def\n', loc=2)
+            itext(u'abc')+itext(u'def\n', loc=2)
             >>> b[2]
             itext(u'c')
             >>> b[3]
-            itext.new(u'd', loc=2)
+            itext(u'd', loc=2)
         '''
         if not isinstance(text, basestring):
             return NotImplemented
@@ -160,11 +157,11 @@ class itext(unicode):
     def __getitem__(self, i):
         r'''A single char is an L{itext} with an offset loc.
 
-            >>> l = itext.new('abc\n', loc=5)
+            >>> l = itext('abc\n', loc=5)
             >>> l[1]
-            itext.new(u'b', loc=6)
+            itext(u'b', loc=6)
             >>> l[-2]
-            itext.new(u'c', loc=7)
+            itext(u'c', loc=7)
         '''
         if i < 0:
             i += len(self)
@@ -175,18 +172,18 @@ class itext(unicode):
     def __getslice__(self, i, j):
         r'''A slice is an L{itext} with an offset loc.
 
-            >>> a = itext.new('abc\n', loc=5)
+            >>> a = itext('abc\n', loc=5)
             >>> a[1:]
-            itext.new(u'bc\n', loc=6)
+            itext(u'bc\n', loc=6)
             >>> a[:-2]
-            itext.new(u'ab', loc=5)
+            itext(u'ab', loc=5)
             >>> a[-3:-1]
-            itext.new(u'bc', loc=6)
+            itext(u'bc', loc=6)
             >>> b = u'xyz' + a + u'def' + a + u'ghi'
             >>> b[2:8]
-            itext(u'z')+itext.new(u'abc\n', loc=5)+itext(u'd')
+            itext(u'z')+itext(u'abc\n', loc=5)+itext(u'd')
             >>> b[4:11]
-            itext.new(u'bc\n', loc=6)+itext(u'def')+itext.new(u'a', loc=5)
+            itext(u'bc\n', loc=6)+itext(u'def')+itext(u'a', loc=5)
         '''
         if i < 0:
             i = 0
@@ -200,15 +197,15 @@ class itext(unicode):
 
     def split(self, sep=None, maxsplit=-1):
         r'''
-            >>> a = itext.new('  abc\nabc \n abc \n', loc=10)
+            >>> a = itext('  abc\nabc \n abc \n', loc=10)
             >>> a.split('b')
-            [itext.new(u'  a', loc=10), itext.new(u'c\na', loc=14), itext.new(u'c \n a', loc=18), itext.new(u'c \n', loc=24)]
+            [itext(u'  a', loc=10), itext(u'c\na', loc=14), itext(u'c \n a', loc=18), itext(u'c \n', loc=24)]
             >>> a.split()
-            [itext.new(u'abc', loc=12), itext.new(u'abc', loc=16), itext.new(u'abc', loc=22)]
+            [itext(u'abc', loc=12), itext(u'abc', loc=16), itext(u'abc', loc=22)]
 
-            >>> b = u' a ' + itext.new(' b', loc=2) + u'  c' + itext.new(u'd  ', loc=100) + u'e'
+            >>> b = u' a ' + itext(' b', loc=2) + u'  c' + itext(u'd  ', loc=100) + u'e'
             >>> b.split()
-            [itext(u'a'), itext.new(u'b', loc=3), itext(u'c')+itext.new(u'd', loc=100), itext(u'e')]
+            [itext(u'a'), itext(u'b', loc=3), itext(u'c')+itext(u'd', loc=100), itext(u'e')]
         '''
         uni = unicode(self)
         spl = uni.split(sep, maxsplit)
@@ -225,11 +222,11 @@ class itext(unicode):
 
     def splitlines(self, keepends=False):
         r'''
-            >>> a = itext.new('  abc\nabc \n abc \n', loc=10)
+            >>> a = itext('  abc\nabc \n abc \n', loc=10)
             >>> a.splitlines()
-            [itext.new(u'  abc', loc=10), itext.new(u'abc ', loc=16), itext.new(u' abc ', loc=21)]
+            [itext(u'  abc', loc=10), itext(u'abc ', loc=16), itext(u' abc ', loc=21)]
             >>> a.splitlines(True)
-            [itext.new(u'  abc\n', loc=10), itext.new(u'abc \n', loc=16), itext.new(u' abc \n', loc=21)]
+            [itext(u'  abc\n', loc=10), itext(u'abc \n', loc=16), itext(u' abc \n', loc=21)]
         '''
         uni = unicode(self)
         spl = uni.splitlines(keepends)
@@ -244,8 +241,8 @@ class itext(unicode):
 
     def join(self, seq):
         r'''
-            >>> itext.new('x', loc=1).join([u'a', itext(u'b'), itext.new(u'c', loc=10)])
-            itext(u'a')+itext.new(u'x', loc=1)+itext(u'b')+itext.new(u'x', loc=1)+itext.new(u'c', loc=10)
+            >>> itext('x', loc=1).join([u'a', itext(u'b'), itext(u'c', loc=10)])
+            itext(u'a')+itext(u'x', loc=1)+itext(u'b')+itext(u'x', loc=1)+itext(u'c', loc=10)
         '''
         r = type(self)(unicode(self).join(seq))
         pos = 0
@@ -267,106 +264,106 @@ class itext(unicode):
 
     def strip(self, chars=None):
         r'''
-            >>> a = itext.new('  abc  \n', loc=1)
+            >>> a = itext('  abc  \n', loc=1)
             >>> a.strip()
-            itext.new(u'abc', loc=3)
+            itext(u'abc', loc=3)
         '''
         return self.lstrip(chars).rstrip(chars)
 
     def lstrip(self, chars=None):
         r'''
-            >>> a = itext.new('  abc  \n', loc=3)
+            >>> a = itext('  abc  \n', loc=3)
             >>> a.lstrip()
-            itext.new(u'abc  \n', loc=5)
+            itext(u'abc  \n', loc=5)
         '''
         s = unicode.lstrip(self, chars)
         return self.__makeslice(s, start= len(self) - len(s))
 
     def rstrip(self, chars=None):
         r'''
-            >>> a = itext.new('  abc  \n', loc=3)
+            >>> a = itext('  abc  \n', loc=3)
             >>> a.rstrip()
-            itext.new(u'  abc', loc=3)
+            itext(u'  abc', loc=3)
         '''
         return self.__makeslice(unicode.rstrip(self, chars))
 
     def capitalize(self):
         r'''
-            >>> a = itext.new('abc', loc=3)
+            >>> a = itext('abc', loc=3)
             >>> a.capitalize()
-            itext.new(u'Abc', loc=3)
+            itext(u'Abc', loc=3)
         '''
         return self.__makeslice(unicode.capitalize(self))
 
     def lower(self):
         r'''
-            >>> a = itext.new('ABc', loc=3)
+            >>> a = itext('ABc', loc=3)
             >>> a.lower()
-            itext.new(u'abc', loc=3)
+            itext(u'abc', loc=3)
         '''
         return self.__makeslice(unicode.lower(self))
 
     def swapcase(self):
         r'''
-            >>> a = itext.new('ABc', loc=3)
+            >>> a = itext('ABc', loc=3)
             >>> a.swapcase()
-            itext.new(u'abC', loc=3)
+            itext(u'abC', loc=3)
         '''
         return self.__makeslice(unicode.swapcase(self))
 
     def title(self):
         r'''
-            >>> a = itext.new('one two THREE', loc=3)
+            >>> a = itext('one two THREE', loc=3)
             >>> a.title()
-            itext.new(u'One Two Three', loc=3)
+            itext(u'One Two Three', loc=3)
         '''
         return self.__makeslice(unicode.title(self))
 
     def upper(self):
         r'''
-            >>> a = itext.new('Abc', loc=3)
+            >>> a = itext('Abc', loc=3)
             >>> a.upper()
-            itext.new(u'ABC', loc=3)
+            itext(u'ABC', loc=3)
         '''
         return self.__makeslice(unicode.upper(self))
 
     def center(self, width, fillchar=u' '):
         r'''
-            >>> a = itext.new('abc', loc=3)
+            >>> a = itext('abc', loc=3)
             >>> a.center(10)
-            itext(u'   ')+itext.new(u'abc', loc=3)+itext(u'    ')
+            itext(u'   ')+itext(u'abc', loc=3)+itext(u'    ')
         '''
         pad = width - len(self)
         return fillchar * (pad / 2) + self + fillchar * ((pad + 1) / 2)
 
     def ljust(self, width, fillchar=u' '):
         r'''
-            >>> a = itext.new('abc', loc=3)
+            >>> a = itext('abc', loc=3)
             >>> a.ljust(10)
-            itext.new(u'abc', loc=3)+itext(u'       ')
+            itext(u'abc', loc=3)+itext(u'       ')
         '''
         return self + fillchar * (width - len(self))
 
     def rjust(self, width, fillchar=u' '):
         r'''
-            >>> a = itext.new('abc', loc=3)
+            >>> a = itext('abc', loc=3)
             >>> a.rjust(10)
-            itext(u'       ')+itext.new(u'abc', loc=3)
+            itext(u'       ')+itext(u'abc', loc=3)
         '''
         return fillchar * (width - len(self)) + self
 
     def zfill(self, width):
         r'''
-            >>> a = itext.new('abc', loc=3)
+            >>> a = itext('abc', loc=3)
             >>> a.zfill(6)
-            itext(u'000')+itext.new(u'abc', loc=3)
+            itext(u'000')+itext(u'abc', loc=3)
         '''
         return self.rjust(width, fillchar=u'0')
 
 class iloc(object):
 
     r'''Describes the location in the input to which an itext coresponds.
-    Suitable for passing as the 'loc' argument of L{itext.new()}.
+    Suitable for passing as the 'loc' argument of L{itext()}.
     '''
 
     def __init__(self, path=None, line=None, column=None):
@@ -467,11 +464,11 @@ class InputError(StandardError):
         >>> str(e)
         "'name', line 4: wah"
 
-        >>> e = InputError('wah', char=itext.new(u'abc', loc=2))
+        >>> e = InputError('wah', char=itext(u'abc', loc=2))
         >>> str(e)
         '2: wah'
 
-        >>> e = InputError('wah', chars=[itext.new(u'abc', loc=2), itext.new(u'def', loc=1)])
+        >>> e = InputError('wah', chars=[itext(u'abc', loc=2), itext(u'def', loc=1)])
         >>> str(e)
         '1: wah'
 
