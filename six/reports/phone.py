@@ -57,6 +57,10 @@ def report_phone(options, model, predicate, local):
                 telephones_qual(tup, sub, **tkw)
         elif isinstance(node, Family):
             tree.add(node, underline=True)
+            for aka in node.aka:
+                tree.add(' (')
+                tree.add(aka)
+                tree.add(')')
             tree.nl()
             dump_comments(node, sub)
             telephones(node, sub, **tkw)
