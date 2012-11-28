@@ -776,6 +776,7 @@ class Booklet(object):
         self._para(u' '.join(contacts), contacts_style)
 
     def add_addresses(self, who):
+        # TODO: Located_at
         for link in who.links(outgoing & is_link(Resides_at)):
             self.add_address(link, link.residence)
 

@@ -343,11 +343,11 @@ class Has_phone(Link):
     def __init__(self, who, tel, comment=None, timestamp=None):
         from six.person import Person
         from six.family import Family
-        from six.org import Organisation, Works_at
+        from six.org import Organisation, Works_at, Located_at
         from six.address import Residence
         from six.links import Resides_at
         assert isinstance(who, (Person, Family, Organisation, Residence,
-                                Resides_at, Works_at))
+                                Resides_at, Located_at, Works_at))
         assert isinstance(tel, Telephone)
         assert comment is None or isinstance(comment, basestring)
         super(Has_phone, self).__init__(who, tel, timestamp=timestamp)

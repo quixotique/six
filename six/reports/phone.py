@@ -94,6 +94,8 @@ def report_phone(options, model, predicate, local):
             dump_comments(node, sub)
             telephones(node, sub, **tkw)
             telephones_org(node, sub, **tkw)
+            for loc in node.nodes(outgoing & is_link(Located_at)):
+                telephones_org(loc, sub, **tkw)
             for dept in node.nodes(outgoing & is_link(Has_department)):
                 sub.add(dept, underline=True)
                 sub.nl()

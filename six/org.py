@@ -11,7 +11,7 @@ from six.multilang import multilang
 __all__ = [
             'Organisation', 'Company', 'Department',
             'Has_department',
-            'Works_at',
+            'Works_at', 'Located_at',
         ]
 
 class Organisation(NamedNode):
@@ -181,3 +181,31 @@ class Works_at(Association):
              'sequence=%r' % self.sequence,]
         return '%s(%s)' % (self.__class__.__name__, ', '.join(r))
 
+class Located_at(Association):
+
+    r'''An association between any two organisations, indicating that the first
+    is located at or contactable through the second.  This can be used in lieu
+    of a residential address for a company or department; the host
+    organisation's contact details (including its name) become part of the
+    contact address for the client organisation.
+    '''
+
+    def __init__(self, client, host, sequence=None, timestamp=None):
+        assert isinstance(client, Organisation)
+        assert isinstance(host, Organisation)
+        super(Located_at, self).__init__(client, host, timestamp=timestamp)
+        self.client = client
+        self.host = host
+        self.sequence = sequence
+
+    def __cmp__(self, other):
+        if not isinstance(other, Located_at):
+            return NotImplemented
+        return (cmp(self.sequence or 0, other.sequence or 0) or
+                cmp(self.client.sortkey(), other.client.sortkey()))
+
+    def __repr__(self):
+        r = ['client=%r' % self.client,
+             'host=%r' % self.host,
+             'sequence=%r' % self.sequence,]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(r))

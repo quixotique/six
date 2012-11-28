@@ -236,6 +236,7 @@ def dump_organisation(org, tree, seen=frozenset(), show_workers=True,
     dump_email(org, tree)
     dump_postal(org, tree)
     dump_residences(org, tree)
+    dump_locations(org, tree, seen)
     if show_workers:
         dump_works_at(org, tree, seen)
     if show_data:
@@ -349,6 +350,25 @@ def dump_residences(who, tree):
         telephones(link, sub)
         dump_comments(link.residence, sub)
         telephones(link.residence, sub)
+
+def dump_locations(org, tree, seen):
+    assert org in seen
+    for link in sorted(org.links(outgoing & is_link(Located_at))):
+        refonly = link.host in seen
+        if refonly:
+            tree.add('c/-> ')
+            tree.add(link.host.sort_keys(tree.sort_mode).next())
+            tree.nl()
+        else:
+            tree.add('c/-- ')
+            dump_names(link.host, tree, link)
+        sub = tree.sub()
+        dump_comments(link, sub)
+        telephones(link, sub)
+        if not refonly:
+            dump_organisation(link.host, sub, seen, show_workers=False, show_data=False)
+        # TODO: addresses of parent organisations
+        dump_data(link, sub)
 
 def dump_data(who, tree):
     others = {}

@@ -528,6 +528,7 @@ class ModelParser(object):
         # First, parse details that can provide place context when parsing
         # telephone numbers.
         self.parse_homes(part, org)
+        self.parse_locations(part, org)
         self.parse_con(part, org, 'po', PostalAddress, Has_postal_address)
         # Now parse the various contact details - phone/fax numbers, email
         # addresses, web pages, etc.  We DON'T parse mobile phone numbers here,
@@ -549,6 +550,7 @@ class ModelParser(object):
         # Parse any 'in' sub-parts.
         for sub in (s for v, s in part.mget('in', []) if s):
             self.parse_homes(sub, org)
+            self.parse_locations(sub, org)
             self.parse_con(sub, org, 'po', PostalAddress, Has_postal_address)
             self.parse_con(sub, org, 'ph', Telephone, Has_fixed_home)
             self.parse_con(sub, org, 'fax', Telephone, Has_fax_home)
@@ -834,7 +836,7 @@ class ModelParser(object):
 
     def parse_homes(self, part, who):
         r'''Parse 'home' lines for a person, family or organisation, which
-        define to one or more residences (optionally with contact details) for
+        define one or more residences (optionally with contact details) for
         that person/organisation.
         '''
         for value, sub in part.mget('home', []):
@@ -847,6 +849,25 @@ class ModelParser(object):
                 sub.updated = self.parse_update(sub) or part.updated
                 sub.defaults = part.defaults
             r = Resides_at(who, res, timestamp=(sub or part).updated)
+            if sub:
+                self.parse_con(sub, r, 'ph', Telephone, Has_fixed)
+                self.parse_con(sub, r, 'fax', Telephone, Has_fax)
+                self.parse_con(sub, r, 'com', Comment, Has_comment)
+
+    def parse_locations(self, part, who):
+        r'''Parse 'loc' lines for an organisation, which define the host
+        residences (optionally with contact details) for that organisation.
+        '''
+        for value, sub in part.mget('loc', []):
+            try:
+                host = self.find(Organisation, value)
+            except LookupError, e:
+                raise InputError(e, char=value)
+            if sub:
+                sub.place = host.only_place()
+                sub.updated = self.parse_update(sub) or part.updated
+                sub.defaults = part.defaults
+            r = Located_at(who, host, timestamp=(sub or part).updated)
             if sub:
                 self.parse_con(sub, r, 'ph', Telephone, Has_fixed)
                 self.parse_con(sub, r, 'fax', Telephone, Has_fax)

@@ -9,7 +9,7 @@ from six.node import (node_predicate, name_imatches, in_place, outgoing,
                       is_link, to_node)
 from six.links import from_node, With, Ex
 from six.keyword import keyed_with
-from six.org import Organisation, Works_at
+from six.org import Organisation, Works_at, Located_at
 from six.util import iempty
 
 __all__ = ['parse_predicate', 'ExprError']
@@ -98,8 +98,8 @@ class Predicate_Parser(object):
             except LookupError, e:
                 raise ExprError('no such place %r' % token[3:])
             return in_place(place)
-        elif (token.startswith('work:') or token.startswith('with:') or
-              token.startswith('ex:')):
+        elif (token.startswith('work:') or token.startswith('loc:') or
+              token.startswith('with:') or token.startswith('ex:')):
             i = token.index(':')
             cond = token[:i]
             name = token[i+1:]
@@ -109,6 +109,7 @@ class Predicate_Parser(object):
                 raise ExprError('no such organisation %r' % name)
             select = {
                 'work': outgoing & is_link(Works_at) & to_node(org),
+                'loc': outgoing & is_link(Located_at) & to_node(org),
                 'with': outgoing & is_link(With) & to_node(org),
                 'ex': outgoing & is_link(Ex) & to_node(org),
             }[cond]

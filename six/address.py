@@ -8,7 +8,7 @@ from six.input import InputError
 from six.node import *
 from six.world import *
 
-__all__ = ['Residence', 'PostalAddress']
+__all__ = ['Residence', 'PostalAddress', 'Location']
 
 class Address(Node):
 
@@ -16,7 +16,6 @@ class Address(Node):
         >>> au = Country('AU', 'en', '61', multilang('Australia'))
         >>> isinstance(au, Node)
         True
-        >>> sa = Area(au, '8', multilang('SA'), multilang('South Australia'))
         >>> a = Address(['50 Clifton St', 'Maylands SA 5069'], Place(au))
         >>> unicode(a)
         u'50 Clifton St; Maylands SA 5069; AUSTRALIA'
@@ -225,3 +224,19 @@ class Residence(Address):
 
 class PostalAddress(Address):
     pass
+
+class Location(Address):
+
+    r'''
+        >>> au = Country('AU', 'en', '61', multilang('Australia'))
+        >>> isinstance(au, Node)
+        True
+        >>> a = Address(['50 Clifton St', 'Maylands SA 5069'], Place(au))
+        >>> a1 = Location(['The Stately Manor'], a)
+        >>> unicode(a1)
+        u'The Stately Manor; 50 Clifton St; Maylands SA 5069; AUSTRALIA'
+    '''
+
+    def __init__(self, qualifying_lines, orig_address):
+        assert isinstance(orig_address, Address)
+        super(Location, self).__init__(lines=tuple(qualifying_lines) + orig_address.lines, place= orig_address.place)
