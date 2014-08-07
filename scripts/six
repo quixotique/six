@@ -144,7 +144,7 @@ def main():
             pred = None
         # Print the selected report.
         report(options, model, pred, local)
-    except (InvocationError, InputError), e:
+    except (IOError, InvocationError, InputError), e:
         print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]), str(e))
         sys.exit(1)
 
