@@ -1,9 +1,10 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model - text utilities.
 '''
 
 import unicodedata
+import collections
 
 __all__ = ['text_sort_key', 'text_match_key', 'sortstr']
 
@@ -12,24 +13,22 @@ def text_sort_key(text):
     sortstr instance, then extract the collation part from it.
 
         >>> text_sort_key('One Two Three33! 456 seven')
-        u'one two three seven'
+        'one two three seven'
 
-        >>> text_sort_key(u'Muñoz Güell, José')
-        u'munoz guell, jose'
+        >>> text_sort_key('MuÃ±oz GÃ¼ell, JosÃ©')
+        'munoz guell, jose'
 
-        >>> t = sortstr(u'Dr José Muñoz Güell, B.Med.')
+        >>> t = sortstr('Dr JosÃ© MuÃ±oz GÃ¼ell, B.Med.')
         >>> t.sortslice = slice(3, 19)
         >>> text_sort_key(t)
-        u'jose munoz guell'
+        'jose munoz guell'
 
     '''
-    if hasattr(text, 'sortstr') and callable(text.sortstr):
+    if hasattr(text, 'sortstr') and isinstance(text.sortstr, collections.Callable):
         text = text.sortstr()
     else:
-        text = unicode(text)
-    return ' '.join(filter(len,
-            (filter(lambda c: c.isalpha() or c == ',', word).lower()
-             for word in remove_diacriticals(text).split())))
+        text = str(text)
+    return ' '.join(w for w in (''.join(c.lower() for c in word if c.isalpha() or c == ',') for word in remove_diacriticals(text).split()) if w)
 
 def text_match_key(text):
     r'''Convert a text into a string used for matching searches.
@@ -37,24 +36,22 @@ def text_match_key(text):
         >>> text_match_key('One Two Three33! 456 seven')
         ' one two three33 456 seven'
 
-        >>> text_match_key(u'Muñoz Güell, José')
-        u' munoz guell jose'
+        >>> text_match_key('MuÃ±oz GÃ¼ell, JosÃ©')
+        ' munoz guell jose'
 
     '''
-    return ' '.join([''] +
-                filter(len, (filter(lambda c: c.isalnum(), word).lower()
-                             for word in remove_diacriticals(text).split())))
+    return ' '.join([''] + list(w for w in (''.join(c.lower() for c in word if c.isalnum()) for word in remove_diacriticals(text).split()) if w))
 
 def remove_diacriticals(text):
     r'''Remove diacritical marks from letters.
     '''
-    if isinstance(text, unicode):
+    if isinstance(text, str):
         return unicodedata.normalize('NFD', text)
     return text
 
-class sortstr(unicode):
+class sortstr(str):
 
-    r'''A subclass of unicode that can be used for strings that are to be
+    r'''A subclass of str that can be used for strings that are to be
     both displayed and sorted.  A single slice() object is associated with the
     string, in the mutable 'sortslice' attribute, which defines the part of the
     string which is to be used for collation.  The preceding and following
@@ -65,19 +62,19 @@ class sortstr(unicode):
 
         >>> s = sortstr('abc')
         >>> s
-        sortstr.new(u'abc')
+        sortstr.new('abc')
         >>> s.sortstr()
-        u'abc'
+        'abc'
         >>> s.sortslice = slice(1, 2)
         >>> s.sortstr()
-        u'b'
+        'b'
 
     '''
 
     def __new__(class_, *args):
         r'''The 'sortslice' attribute is initialised to cover the whole string.
         '''
-        obj = unicode.__new__(class_, *args)
+        obj = str.__new__(class_, *args)
         obj.sortslice = slice(len(obj))
         return obj
 
@@ -95,7 +92,7 @@ class sortstr(unicode):
                 self[self.sortslice.stop:])
 
     def __repr__(self):
-        r = [repr(unicode(self))]
+        r = [repr(str(self))]
         if self.sortslice != slice(len(self)):
             r.append(repr(self.sortslice))
         return '%s.new(%s)' % (self.__class__.__name__, ', '.join(r))

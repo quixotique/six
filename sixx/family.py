@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model - Family.
 '''
@@ -9,6 +9,7 @@ from sixx.person import Person
 from sixx.uniq import uniq_generator
 from sixx.multilang import *
 from sixx.sort import SortMode
+import collections
 
 __all__ = ['Family']
 
@@ -62,7 +63,7 @@ class Family(NamedNode):
                 r.insert(-1, surname + ', ')
             else:
                 r.append(surname)
-        return u''.join(r)
+        return ''.join(r)
 
     def only_place(self):
         r'''A family's place depends on its residence(s), or if there are none,
@@ -118,7 +119,7 @@ class Family(NamedNode):
                     coll[fn].append(gn)
                 except ValueError:
                     pass
-            for fn, gns in coll.iteritems():
+            for fn, gns in coll.items():
                 yield fn + ', ' + ' & '.join(gns)
         for aka in self.aka:
             yield aka
@@ -140,7 +141,7 @@ class Family(NamedNode):
         r'''Return true if the name of this family matches the given text.
         '''
         heads = list(self.heads())
-        parts = filter(bool, [p.strip() for p in text.split('&')])
+        parts = list(filter(bool, [p.strip() for p in text.split('&')]))
         if len(parts) == len(heads):
             for h, p in zip(heads, parts):
                 if not h.matches(p):
@@ -148,7 +149,7 @@ class Family(NamedNode):
             else:
                 return True
         for name in self.aka:
-            if hasattr(name, 'matches') and callable(name.matches):
+            if hasattr(name, 'matches') and isinstance(name.matches, collections.Callable):
                 if name.matches(text):
                     return True
             elif name.startswith(text):

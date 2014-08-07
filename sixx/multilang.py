@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Multi-language text.
 '''
@@ -19,22 +19,22 @@ class multilang(object):
         >>> t
         multilang('Spain')
 
-        >>> t = multilang(en='Spain', es=u'España')
+        >>> t = multilang(en='Spain', es='EspaÃ±a')
         >>> t
-        multilang(en='Spain', es=u'Espa\xf1a')
+        multilang(en='Spain', es='Espa\xf1a')
 
     '''
 
     def __init__(self, *args, **kwargs):
         if len(args) == 1:
             assert len(kwargs) == 0
-            assert isinstance(args[0], basestring)
+            assert isinstance(args[0], str)
             self.text = args[0]
         else:
             self.alt = {}
             assert len(args) == 0
             assert len(kwargs) >= 1
-            for lang, text in kwargs.iteritems():
+            for lang, text in kwargs.items():
                 assert isinstance(lang, str)
                 assert len(lang) in (2, 5)
                 assert lang[:2].isalpha()
@@ -42,61 +42,50 @@ class multilang(object):
                     assert lang[2] == '_'
                     assert lang[3:].isalpha()
                     assert lang[3:].isupper()
-                assert isinstance(text, basestring)
+                assert isinstance(text, str)
                 self.alt[lang] = text
 
-    def __unicode__(self):
+    def __str__(self):
         r'''Return the localised form of the text that depends on the current
         locale.  If there is no form in the current locale's language, or the
         form is an empty string, then return a non-empty form at random.
 
-            >>> t = multilang(en='Spain', es=u'España')
+            >>> t = multilang(en='Spain', es='EspaÃ±a')
             >>> loc = locale.getlocale(locale.LC_MESSAGES)
             >>> try:
             ...     locale.setlocale(locale.LC_MESSAGES, 'en_AU.utf8')
-            ...     unicode(t)
+            ...     str(t)
             ...     locale.setlocale(locale.LC_MESSAGES, 'es_ES.utf8')
-            ...     unicode(t)
-            ... finally:
-            ...     dum = locale.setlocale(locale.LC_MESSAGES, loc)
-            'en_AU.utf8'
-            u'Spain'
-            'es_ES.utf8'
-            u'Espa\xf1a'
-
-        '''
-        return self.__as(unicode)
-
-    def __str__(self):
-        r'''Return the localised form of the text as for __unicode__(), encoded
-        to a string using the current encoding.  This may raise an exception if
-        the current encoding cannot encode the form.
-
-            >>> t = multilang(en='Spain', es=u'España')
-            >>> loc = locale.getlocale(locale.LC_MESSAGES)
-            >>> try:
-            ...     locale.setlocale(locale.LC_MESSAGES, 'en_AU.utf8')
             ...     str(t)
             ... finally:
             ...     dum = locale.setlocale(locale.LC_MESSAGES, loc)
             'en_AU.utf8'
             'Spain'
-            >>> try:
-            ...     locale.setlocale(locale.LC_MESSAGES, 'es_ES.utf8')
-            ...     str(t)
-            ... finally:
-            ...     dum = locale.setlocale(locale.LC_MESSAGES, loc)
-            Traceback (most recent call last):
-            UnicodeEncodeError: 'ascii' codec can't encode character u'\xf1' in position 4: ordinal not in range(128)
+            'es_ES.utf8'
+            'Espa\xf1a'
 
         '''
-        return self.__as(str)
+        if hasattr(self, 'alt'):
+            lang = locale.getlocale(locale.LC_MESSAGES)[0]
+            if lang is not None:
+                try:
+                    s = self.local(lang)
+                    if s:
+                        return str(s)
+                except KeyError:
+                    pass
+            for s in self.alt.values():
+                if s:
+                    return str(s)
+            return str()
+        return str(self.text)
 
-    def __nonzero__(self):
+
+    def __bool__(self):
         r'''Tests as true if contains any non-empty string.
         '''
         if hasattr(self, 'alt'):
-            for alt in self.alt.itervalues():
+            for alt in self.alt.values():
                 if alt:
                     return True
             return False
@@ -105,45 +94,29 @@ class multilang(object):
     def upper(self):
         r'''Return a new multilang object with all texts in uppercase.
 
-            >>> t = multilang(en='Spain', es=u'España')
+            >>> t = multilang(en='Spain', es='EspaÃ±a')
             >>> t.upper()
-            multilang(en='SPAIN', es=u'ESPA\xd1A')
+            multilang(en='SPAIN', es='ESPA\xd1A')
 
         '''
         u = type(self).__new__(type(self))
         if hasattr(self, 'alt'):
             u.alt = dict((lang, text.upper())
-                         for lang, text in self.alt.iteritems())
+                         for lang, text in self.alt.items())
         else:
             u.text = self.text.upper()
         return u
 
-    def __as(self, strtype):
-        if hasattr(self, 'alt'):
-            lang = locale.getlocale(locale.LC_MESSAGES)[0]
-            if lang is not None:
-                try:
-                    s = self.local(lang)
-                    if s:
-                        return strtype(s)
-                except KeyError:
-                    pass
-            for s in self.alt.itervalues():
-                if s:
-                    return strtype(s)
-            return strtype()
-        return strtype(self.text)
-
     def local(self, lang):
-        r'''Return a localised form of the text (str or unicode), given the
-        local language.  If there is no form in the given language, then raise
+        r'''Return a localised form of the text (str), given the local
+        language.  If there is no form in the given language, then raise
         ValueError.
 
-            >>> t = multilang(en='Spain', es=u'España')
+            >>> t = multilang(en='Spain', es='EspaÃ±a')
             >>> t.local('en')
             'Spain'
             >>> t.local('es')
-            u'Espa\xf1a'
+            'Espa\xf1a'
             >>> t.local('de')
             Traceback (most recent call last):
             ValueError: text has no form in language 'de'
@@ -167,11 +140,11 @@ class multilang(object):
         given language, or if not specified, the language of the current
         locale, followed by all other languages in undefined order.
 
-            >>> t = multilang(en='Spain', es=u'España')
+            >>> t = multilang(en='Spain', es='EspaÃ±a')
             >>> list(t.itertexts('en'))
-            ['Spain', u'Espa\xf1a']
+            ['Spain', 'Espa\xf1a']
             >>> list(t.itertexts('es'))
-            [u'Espa\xf1a', 'Spain']
+            ['Espa\xf1a', 'Spain']
 
         '''
         if lang is None:
@@ -186,7 +159,7 @@ class multilang(object):
             if self.text != first:
                 yield self.text
         else:
-            for alt in self.alt.itervalues():
+            for alt in self.alt.values():
                 if alt != first:
                     yield alt
 
@@ -201,7 +174,7 @@ class multilang(object):
     def matches(self, text):
         if hasattr(self, 'text'):
             return self.text == text
-        for v in self.alt.itervalues():
+        for v in self.alt.values():
             if v == text:
                 return True
         return False
@@ -209,7 +182,7 @@ class multilang(object):
     def imatches(self, itext):
         if hasattr(self, 'text'):
             return itext in text_match_key(self.text)
-        for v in self.alt.itervalues():
+        for v in self.alt.values():
             if itext in text_match_key(v):
                 return True
         return False
@@ -240,7 +213,7 @@ class multilang(object):
         if hasattr(self, 'text'):
             return loc_of(self.text)
         if self.alt:
-            return min([loc_of(a) for a in self.alt.itervalues()])
+            return min([loc_of(a) for a in self.alt.values()])
         return None
 
     _re_parse = re.compile(r'(?:([a-z]{2}):)?"([^"]*)"\s*')
@@ -257,12 +230,12 @@ class multilang(object):
             >>> multilang.parse('"abc" ')
             ('', multilang('abc'))
 
-            >>> multilang.parse(u'en:"Spain" es:"España" abc')
-            (u'abc', multilang(en=u'Spain', es=u'Espa\xf1a'))
+            >>> multilang.parse('en:"Spain" es:"EspaÃ±a" abc')
+            ('abc', multilang(en='Spain', es='Espa\xf1a'))
 
-            >>> multilang.parse(itext(u'en:"Spain" "España" abc', loc=iloc(column=1)))
+            >>> multilang.parse(itext('en:"Spain" "EspaÃ±a" abc', loc=iloc(column=1)))
             Traceback (most recent call last):
-            InputError: column 12: bare text mixed with language text
+            sixx.input.InputError: column 12: bare text mixed with language text
 
         '''
         otext = text
@@ -320,11 +293,11 @@ def expand_multilang_generator(func):
 
         >>> @expand_multilang_generator
         ... def f():
-        ...     yield multilang(en='Spain', es=u'España')
+        ...     yield multilang(en='Spain', es='EspaÃ±a')
         ...     yield 'Australia'
         ...     yield multilang(en='Germany', es='Alemania')
         >>> list(f())
-        ['Spain', u'Espa\xf1a', 'Australia', 'Germany', 'Alemania']
+        ['Spain', 'Espa\xf1a', 'Australia', 'Germany', 'Alemania']
 
     '''
     def newfunc(*args, **kwargs):

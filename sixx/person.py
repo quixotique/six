@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model.
 '''
@@ -157,7 +157,7 @@ class Person(NamedNode):
 
     def birthday(self):
         try:
-            return self.links(outgoing & is_link(Born_on)).next()
+            return next(self.links(outgoing & is_link(Born_on)))
         except StopIteration:
             return None
 
@@ -224,8 +224,8 @@ class Person(NamedNode):
             if dkw:
                 name = DecoratedName(name, **dkw)
             return class_(name, **kwargs)
-        except ValueError, e:
-            raise InputError(e, lines=kw.values())
+        except ValueError as e:
+            raise InputError(e, lines=list(kw.values()))
 
 class Birthday(Node):
 
@@ -238,9 +238,6 @@ class Birthday(Node):
         self.month = month
 
     def __str__(self):
-        return str(unicode(self))
-
-    def __unicode__(self):
         return self.format()
 
     def format(self, year=None):
@@ -252,10 +249,14 @@ class Birthday(Node):
         return time.strftime(fmt, time.struct_time(
                              (year, self.month, self.day, 0, 0, 0, 0, 0, 0)))
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if not isinstance(other, Birthday):
             return NotImplemented
-        return cmp(self.month, other.month) or cmp(self.day, other.day)
+        if self.month < other.month:
+            return True
+        if self.month > other.month:
+            return False
+        return self.day < other.day
 
     @classmethod
     def parse(class_, text):
@@ -276,9 +277,6 @@ class Born_on(Link):
         self.year = year
 
     def __str__(self):
-        return str(unicode(self))
-
-    def __unicode__(self):
         return self.format()
 
     def format(self):

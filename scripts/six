@@ -1,5 +1,5 @@
 #!/usr/bin/env python2.5
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 '''Run the doctests in all of the listed modules.  If a module search path is
 given with the --path option, then only that path is searched for the modules
@@ -9,11 +9,12 @@ packages contained within them.
 '''
 
 import sys
+import collections
 sys.path.pop(0)
 import locale
 import os
 import os.path
-import cPickle as pickle
+import pickle as pickle
 import errno
 from optparse import OptionParser
 import sixx.parse as parse
@@ -32,8 +33,8 @@ def main():
     # Form list of reports from the available global functions whose names
     # start with "report_".
     reports = dict([(name[7:], (obj, globals().get(name + '_getopt')))
-                            for name, obj in globals().iteritems()
-                            if callable(obj) and name.startswith('report_')])
+                            for name, obj in globals().items()
+                            if isinstance(obj, collections.Callable) and name.startswith('report_')])
     # Must be at least one report defined.
     assert reports
     op = OptionParser(usage=
@@ -80,12 +81,11 @@ def main():
         # path.
         try:
             srcpath = os.environ['SIX_SOURCE']
-        except LookupError, e:
+        except LookupError as e:
             raise EnvError('missing', var='SIX_SOURCE')
         if not os.path.isfile(srcpath):
             raise EnvError('file missing', var='SIX_SOURCE')
-        cache = os.path.join(os.path.dirname(srcpath),
-                             '.sixx-cache-' + os.path.basename(srcpath))
+        cache = os.path.join(os.path.dirname(srcpath), '.sixx-cache-' + os.path.basename(srcpath))
         # If the cache exists, attempt to read the model from it.  In the event
         # that it fails to read correctly, silently skip it and proceed to
         # compile the model from source, then save the compiled model in the
@@ -94,8 +94,12 @@ def main():
         if (    os.path.exists(cache) and
                 (os.stat(srcpath).st_mtime <= os.stat(cache).st_mtime)):
             try:
-                model = pickle.load(file(cache, 'r'))
-            except StandardError:
+                with open(cache, 'rb') as f:
+                    #print('loading %r ...' % cache, file=sys.stderr)
+                    model = pickle.load(f)
+                    #print('loaded', file=sys.stderr)
+            except Exception:
+                sys.excepthook(*sys.exc_info())
                 pass
         if model is None:
             model = Model()
@@ -104,19 +108,22 @@ def main():
                 for block in parse.blocks(parse.remove_comments(parse.lines(srcpath))):
                     parser.parse_block(block)
                 parser.finish_parsing()
-            except IOError, e:
+            except IOError as e:
                 raise InputError('error parsing source file: %s' % (e,),
                                  path=srcpath)
             finally:
                 parser.finalise()
             try:
                 os.remove(cache)
-            except OSError, e:
+            except OSError as e:
                 if e.errno != errno.ENOENT:
                     raise
             orl = sys.getrecursionlimit()
             sys.setrecursionlimit(4000)
-            pickle.dump(model, file(cache, 'w'))
+            with open(cache, 'wb') as f:
+                #print('dumping %r ...' % cache, file=sys.stderr)
+                pickle.dump(model, f, pickle.HIGHEST_PROTOCOL)
+                #print('dumped', file=sys.stderr)
             sys.setrecursionlimit(orl)
         # Determine the local location for relative rewriting of addresses and
         # telephone numbers.  If not given as a command-line option, then look
@@ -126,26 +133,26 @@ def main():
         if options.local:
             try:
                 local = model.lookup_place(options.local)
-            except LookupError, e:
+            except LookupError as e:
                 raise ArgError(e, arg=options.local)
         elif 'SIX_LOCAL' in os.environ:
             try:
                 local = model.lookup_place(os.environ['SIX_LOCAL'])
-            except LookupError, e:
+            except LookupError as e:
                 raise EnvError('missing', var='SIX_LOCAL')
         # Parse command-line args as search expression.  If no args, then
         # select all nodes.
         if args:
             try:
-                pred = parse_predicate(model, [arg.decode(enc) for arg in args])
-            except ExprError, e:
+                pred = parse_predicate(model, args)
+            except ExprError as e:
                 raise ArgError(e)
         else:
             pred = None
         # Print the selected report.
         report(options, model, pred, local)
-    except (IOError, InvocationError, InputError), e:
-        print >>sys.stderr, '%s: %s' % (os.path.basename(sys.argv[0]), str(e))
+    except (IOError, InvocationError, InputError) as e:
+        print('%s: %s' % (os.path.basename(sys.argv[0]), str(e)), file=sys.stderr)
         sys.exit(1)
 
 def opt_doctest(option, opt_str, value, parser):
@@ -168,7 +175,7 @@ def opt_doctest(option, opt_str, value, parser):
             status = 1
     sys.exit(status)
 
-class InvocationError(StandardError):
+class InvocationError(Exception):
     pass
 
 class ArgError(InvocationError):

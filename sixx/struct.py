@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Generic data structure.
 
@@ -23,7 +23,7 @@ class struct(object):
     def __repr__(self):
         return '%s(%s)' % (self.__class__.__name__,
                 ', '.join(('%s=%r' % i
-                           for i in sorted(self.__dict__.iteritems()))))
+                           for i in sorted(self.__dict__.items()))))
 
     def __eq__(self, other):
         if not isinstance(other, struct):
@@ -34,3 +34,9 @@ class struct(object):
         if not isinstance(other, struct):
             raise NotImplemented
         return not self.__eq__(other)
+
+    def __hash__(self):
+        h = 0
+        for key, value in self.__dict__.items():
+            h ^= hash(key) ^ hash(value)
+        return h

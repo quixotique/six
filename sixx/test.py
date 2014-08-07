@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Testing.
 '''
@@ -39,21 +39,21 @@ def run_doctest(name, search_path, recurse=False, prefix='', verbose=False):
             finally:
                 if file is not None:
                     file.close()
-    except ImportError, e:
-        print '%s: cannot test: %s' % (module_name, str(e))
+    except ImportError as e:
+        print('%s: cannot test: %s' % (module_name, str(e)))
         return len(prefix) != 0
     # Run the doctests in the module we just loaded.
     ret = True
     if verbose:
-        print mod.__name__, mod.__file__
+        print(mod.__name__, mod.__file__)
     try:
         result = doctest.testmod(mod, verbose=verbose)
-    except ValueError, e:
-        print '%s: %s' % (module_name, e)
+    except ValueError as e:
+        print('%s: %s' % (module_name, e))
         ret = False
     else:
-        print '%s: ran %u tests, %u failed' % (module_name,
-                          result[1], result[0])
+        print('%s: ran %u tests, %u failed' % (module_name,
+                          result[1], result[0]))
         if result[0]:
             ret = False
     # If the --recursive option was given, and the module we loaded is in fact

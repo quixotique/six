@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model - Link subclasses.
 '''
@@ -46,8 +46,7 @@ class Belongs_to(Link):
     (typically the offspring).
     '''
 
-    def __init__(self, person, family, is_head=False, sequence=None,
-                       timestamp=None):
+    def __init__(self, person, family, is_head=False, sequence=None, timestamp=None):
         from sixx.person import Person
         from sixx.family import Family
         assert isinstance(person, Person)
@@ -126,13 +125,12 @@ class Association(Link):
 
     def __init__(self, node1, node2, position=None, timestamp=None):
         if position is not None:
-            assert isinstance(position, (basestring, multilang))
-        super(Association, self).__init__(node1, node2, timestamp=timestamp)
+            assert isinstance(position, (str, multilang))
         self.position = position
+        super(Association, self).__init__(node1, node2, timestamp=timestamp)
 
     def __repr__(self):
-        return '%s(node1=%r, node2=%r)' % (type(self).__name__, self.node1,
-                                           self.node2)
+        return '%s(node1=%r, node2=%r)' % (type(self).__name__, self.node1, self.node2)
 
 class With(Association):
 

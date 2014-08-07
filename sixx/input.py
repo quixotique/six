@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Traceable input.  An L{itext} string keeps track of the origin of every one
 of its characters using an L{iloc} object, which stores a path name, line
@@ -8,18 +8,19 @@ messages based on any fragment of the input, because the L{itext} string will
 correctly supply the location of that fragment in the application's input.
 
 '''
+import collections
 
-from itertools import ifilter
+
 
 __all__ = ['itext', 'iloc', 'InputError', 'loc_of']
 
-class itext(unicode):
+class itext(str):
 
     r'''All input text is treated as Unicode.
 
         >>> l = itext('abc\n', loc=50)
         >>> l
-        itext(u'abc\n', loc=50)
+        itext('abc\n', loc=50)
         >>> str(l)
         'abc\n'
         >>> len(l)
@@ -28,11 +29,11 @@ class itext(unicode):
         50
     '''
 
-    def __new__(cls, text=u'', loc=None):
-        r'''Since we're overriding the builtin L{unicode} class, we can't mess
+    def __new__(cls, text='', loc=None):
+        r'''Since we're overriding the builtin L{str} class, we can't mess
         with the constructor, so we use this special class method to construct
         itext instances.
-        @param text: any object that supports unicode(text)
+        @param text: any object that supports str(text)
         @param loc: either None or any object that supports integer addition
             and subtraction: loc +- int -> loc
         '''
@@ -43,9 +44,9 @@ class itext(unicode):
         return obj
 
     def __reduce__(self):
-        r'''We pickle ourselves to a unicode string.
+        r'''We pickle ourselves to a string.
         '''
-        return (unicode, (unicode(self),))
+        return (str, (str(self),))
 
     def loc(self):
         r'''Return the location of the first "located" character in this
@@ -54,13 +55,13 @@ class itext(unicode):
             >>> a = itext('abc\n', loc=5)
             >>> a.loc()
             5
-            >>> b = u'...' + a
+            >>> b = '...' + a
             >>> b
-            itext(u'...')+itext(u'abc\n', loc=5)
+            itext('...')+itext('abc\n', loc=5)
             >>> b.loc()
             5
             >>> b[0]
-            itext(u'.')
+            itext('.')
             >>> b[0].loc() is None
             True
         '''
@@ -73,9 +74,9 @@ class itext(unicode):
         evaluated to create an identical string.
 
             >>> a = itext('abc\n', loc=5)
-            >>> b = u'xyz' + a + u'def' + a + u'ghi'
+            >>> b = 'xyz' + a + 'def' + a + 'ghi'
             >>> b
-            itext(u'xyz')+itext(u'abc\n', loc=5)+itext(u'def')+itext(u'abc\n', loc=5)+itext(u'ghi')
+            itext('xyz')+itext('abc\n', loc=5)+itext('def')+itext('abc\n', loc=5)+itext('ghi')
             >>> b == eval(repr(b))
             True
         '''
@@ -85,31 +86,28 @@ class itext(unicode):
         for start, end, loc in self.__loc:
             assert start >= pos
             if pos != start:
-                r.append('%s(%r)' % (classname,
-                        unicode.__getslice__(self, pos, start)))
-            r.append('%s(%r, loc=%r)' % (classname,
-                     unicode.__getslice__(self, start, end), loc))
+                r.append('%s(%r)' % (classname, str(self)[pos:start]))
+            r.append('%s(%r, loc=%r)' % (classname, str(self)[start:end], loc))
             pos = end
         assert pos <= len(self)
         if pos != len(self):
-            r.append('%s(%r)' % (classname,
-                    unicode.__getslice__(self, pos, len(self))))
+            r.append('%s(%r)' % (classname, str(self)[pos:]))
         return '+'.join(r)
 
     def __add__(self, text):
         r'''
             >>> a = itext('abc\n', loc=2)
-            >>> b = a + u'def'
+            >>> b = a + 'def'
             >>> b
-            itext(u'abc\n', loc=2)+itext(u'def')
+            itext('abc\n', loc=2)+itext('def')
             >>> b[3]
-            itext(u'\n', loc=5)
+            itext('\n', loc=5)
             >>> b[4]
-            itext(u'd')
+            itext('d')
         '''
-        if not isinstance(text, basestring):
+        if not isinstance(text, str):
             return NotImplemented
-        r = type(self)(unicode(self) + unicode(text))
+        r = type(self)(str(self) + str(text))
         r.__loc = list(self.__loc)
         if isinstance(text, itext):
             for start, end, loc in text.__loc:
@@ -119,17 +117,17 @@ class itext(unicode):
     def __radd__(self, text):
         r'''
             >>> a = itext('def\n', loc=2)
-            >>> b = u'abc' + a
+            >>> b = 'abc' + a
             >>> b
-            itext(u'abc')+itext(u'def\n', loc=2)
+            itext('abc')+itext('def\n', loc=2)
             >>> b[2]
-            itext(u'c')
+            itext('c')
             >>> b[3]
-            itext(u'd', loc=2)
+            itext('d', loc=2)
         '''
-        if not isinstance(text, basestring):
+        if not isinstance(text, str):
             return NotImplemented
-        r = type(self)(unicode(text) + unicode(self))
+        r = type(self)(str(text) + str(self))
         r.__loc = []
         if isinstance(text, itext):
             r.__loc.extend(text.__loc)
@@ -139,7 +137,7 @@ class itext(unicode):
 
     def __makeslice(self, text, start=0):
         loc = []
-        assert type(text) is unicode
+        assert type(text) is str
         r = type(self)(text)
         assert len(r) <= len(self)
         if len(r):
@@ -159,55 +157,62 @@ class itext(unicode):
 
             >>> l = itext('abc\n', loc=5)
             >>> l[1]
-            itext(u'b', loc=6)
+            itext('b', loc=6)
             >>> l[-2]
-            itext(u'c', loc=7)
-        '''
-        if i < 0:
-            i += len(self)
-        if not 0 <= i < len(self):
-            raise IndexError('string index out of range')
-        return self.__getslice__(i, i + 1)
+            itext('c', loc=7)
 
-    def __getslice__(self, i, j):
-        r'''A slice is an L{itext} with an offset loc.
+        A slice is an L{itext} with an offset loc.
 
             >>> a = itext('abc\n', loc=5)
             >>> a[1:]
-            itext(u'bc\n', loc=6)
+            itext('bc\n', loc=6)
             >>> a[:-2]
-            itext(u'ab', loc=5)
+            itext('ab', loc=5)
             >>> a[-3:-1]
-            itext(u'bc', loc=6)
-            >>> b = u'xyz' + a + u'def' + a + u'ghi'
+            itext('bc', loc=6)
+            >>> b = 'xyz' + a + 'def' + a + 'ghi'
             >>> b[2:8]
-            itext(u'z')+itext(u'abc\n', loc=5)+itext(u'd')
+            itext('z')+itext('abc\n', loc=5)+itext('d')
             >>> b[4:11]
-            itext(u'bc\n', loc=6)+itext(u'def')+itext(u'a', loc=5)
+            itext('bc\n', loc=6)+itext('def')+itext('a', loc=5)
         '''
-        if i < 0:
+        if type(i) is slice:
+            i, j = i.start, i.stop
+        else:
+            if i < 0:
+                i += len(self)
+            if not 0 <= i < len(self):
+                raise IndexError('string index out of range')
+            j = i + 1
+        if i is None:
             i = 0
+        elif i < 0:
+            i += len(self)
+            if i < 0:
+                i = 0
         elif i > len(self):
             i = len(self)
-        if j < 0:
-            j = 0
-        elif j > len(self):
+        if j is None or j > len(self):
             j = len(self)
-        return self.__makeslice(unicode.__getslice__(self, i, j), i)
+        elif j < 0:
+            j += len(self)
+            if j < 0:
+                j = 0
+        return self.__makeslice(str(self)[i:j], i)
 
     def split(self, sep=None, maxsplit=-1):
         r'''
             >>> a = itext('  abc\nabc \n abc \n', loc=10)
             >>> a.split('b')
-            [itext(u'  a', loc=10), itext(u'c\na', loc=14), itext(u'c \n a', loc=18), itext(u'c \n', loc=24)]
+            [itext('  a', loc=10), itext('c\na', loc=14), itext('c \n a', loc=18), itext('c \n', loc=24)]
             >>> a.split()
-            [itext(u'abc', loc=12), itext(u'abc', loc=16), itext(u'abc', loc=22)]
+            [itext('abc', loc=12), itext('abc', loc=16), itext('abc', loc=22)]
 
-            >>> b = u' a ' + itext(' b', loc=2) + u'  c' + itext(u'd  ', loc=100) + u'e'
+            >>> b = ' a ' + itext(' b', loc=2) + '  c' + itext('d  ', loc=100) + 'e'
             >>> b.split()
-            [itext(u'a'), itext(u'b', loc=3), itext(u'c')+itext(u'd', loc=100), itext(u'e')]
+            [itext('a'), itext('b', loc=3), itext('c')+itext('d', loc=100), itext('e')]
         '''
-        uni = unicode(self)
+        uni = str(self)
         spl = uni.split(sep, maxsplit)
         pos = 0
         r = []
@@ -224,11 +229,11 @@ class itext(unicode):
         r'''
             >>> a = itext('  abc\nabc \n abc \n', loc=10)
             >>> a.splitlines()
-            [itext(u'  abc', loc=10), itext(u'abc ', loc=16), itext(u' abc ', loc=21)]
+            [itext('  abc', loc=10), itext('abc ', loc=16), itext(' abc ', loc=21)]
             >>> a.splitlines(True)
-            [itext(u'  abc\n', loc=10), itext(u'abc \n', loc=16), itext(u' abc \n', loc=21)]
+            [itext('  abc\n', loc=10), itext('abc \n', loc=16), itext(' abc \n', loc=21)]
         '''
-        uni = unicode(self)
+        uni = str(self)
         spl = uni.splitlines(keepends)
         pos = 0
         r = []
@@ -241,10 +246,10 @@ class itext(unicode):
 
     def join(self, seq):
         r'''
-            >>> itext('x', loc=1).join([u'a', itext(u'b'), itext(u'c', loc=10)])
-            itext(u'a')+itext(u'x', loc=1)+itext(u'b')+itext(u'x', loc=1)+itext(u'c', loc=10)
+            >>> itext('x', loc=1).join(['a', itext('b'), itext('c', loc=10)])
+            itext('a')+itext('x', loc=1)+itext('b')+itext('x', loc=1)+itext('c', loc=10)
         '''
-        r = type(self)(unicode(self).join(seq))
+        r = type(self)(str(self).join(seq))
         pos = 0
         assert len(r.__loc) == 0
         if len(seq):
@@ -266,7 +271,7 @@ class itext(unicode):
         r'''
             >>> a = itext('  abc  \n', loc=1)
             >>> a.strip()
-            itext(u'abc', loc=3)
+            itext('abc', loc=3)
         '''
         return self.lstrip(chars).rstrip(chars)
 
@@ -274,81 +279,81 @@ class itext(unicode):
         r'''
             >>> a = itext('  abc  \n', loc=3)
             >>> a.lstrip()
-            itext(u'abc  \n', loc=5)
+            itext('abc  \n', loc=5)
         '''
-        s = unicode.lstrip(self, chars)
+        s = str.lstrip(self, chars)
         return self.__makeslice(s, start= len(self) - len(s))
 
     def rstrip(self, chars=None):
         r'''
             >>> a = itext('  abc  \n', loc=3)
             >>> a.rstrip()
-            itext(u'  abc', loc=3)
+            itext('  abc', loc=3)
         '''
-        return self.__makeslice(unicode.rstrip(self, chars))
+        return self.__makeslice(str.rstrip(self, chars))
 
     def capitalize(self):
         r'''
             >>> a = itext('abc', loc=3)
             >>> a.capitalize()
-            itext(u'Abc', loc=3)
+            itext('Abc', loc=3)
         '''
-        return self.__makeslice(unicode.capitalize(self))
+        return self.__makeslice(str.capitalize(self))
 
     def lower(self):
         r'''
             >>> a = itext('ABc', loc=3)
             >>> a.lower()
-            itext(u'abc', loc=3)
+            itext('abc', loc=3)
         '''
-        return self.__makeslice(unicode.lower(self))
+        return self.__makeslice(str.lower(self))
 
     def swapcase(self):
         r'''
             >>> a = itext('ABc', loc=3)
             >>> a.swapcase()
-            itext(u'abC', loc=3)
+            itext('abC', loc=3)
         '''
-        return self.__makeslice(unicode.swapcase(self))
+        return self.__makeslice(str.swapcase(self))
 
     def title(self):
         r'''
             >>> a = itext('one two THREE', loc=3)
             >>> a.title()
-            itext(u'One Two Three', loc=3)
+            itext('One Two Three', loc=3)
         '''
-        return self.__makeslice(unicode.title(self))
+        return self.__makeslice(str.title(self))
 
     def upper(self):
         r'''
             >>> a = itext('Abc', loc=3)
             >>> a.upper()
-            itext(u'ABC', loc=3)
+            itext('ABC', loc=3)
         '''
-        return self.__makeslice(unicode.upper(self))
+        return self.__makeslice(str.upper(self))
 
-    def center(self, width, fillchar=u' '):
+    def center(self, width, fillchar=' '):
         r'''
             >>> a = itext('abc', loc=3)
             >>> a.center(10)
-            itext(u'   ')+itext(u'abc', loc=3)+itext(u'    ')
+            itext('   ')+itext('abc', loc=3)+itext('    ')
         '''
         pad = width - len(self)
-        return fillchar * (pad / 2) + self + fillchar * ((pad + 1) / 2)
+        return fillchar * (pad // 2) + self + fillchar * ((pad + 1) // 2)
 
-    def ljust(self, width, fillchar=u' '):
+    def ljust(self, width, fillchar=' '):
         r'''
             >>> a = itext('abc', loc=3)
             >>> a.ljust(10)
-            itext(u'abc', loc=3)+itext(u'       ')
+            itext('abc', loc=3)+itext('       ')
         '''
         return self + fillchar * (width - len(self))
 
-    def rjust(self, width, fillchar=u' '):
+    def rjust(self, width, fillchar=' '):
         r'''
             >>> a = itext('abc', loc=3)
             >>> a.rjust(10)
-            itext(u'       ')+itext(u'abc', loc=3)
+            itext('       ')+itext('abc', loc=3)
         '''
         return fillchar * (width - len(self)) + self
 
@@ -356,9 +361,9 @@ class itext(unicode):
         r'''
             >>> a = itext('abc', loc=3)
             >>> a.zfill(6)
-            itext(u'000')+itext(u'abc', loc=3)
+            itext('000')+itext('abc', loc=3)
         '''
-        return self.rjust(width, fillchar=u'0')
+        return self.rjust(width, fillchar='0')
 
 class iloc(object):
 
@@ -416,34 +421,55 @@ class iloc(object):
             r.append('column=%d' % self.column)
         return '%s(%s)' % (self.__class__.__name__, ', '.join(r))
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         r'''To help in reporting errors in lexical order, iloc objects have a
         natural order.
 
-            >>> cmp(iloc('a'), iloc('b'))
-            -1
+            >>> iloc('a') < iloc('b')
+            True
 
-            >>> cmp(iloc('a', 2), iloc('a', 1))
-            1
+            >>> iloc('a', 2) > iloc('a', 1)
+            True
 
-            >>> cmp(iloc('a', 2, 10), iloc('a', 2, 11))
-            -1
+            >>> iloc('a', 2, 10) < iloc('a', 2, 11)
+            True
 
-            >>> cmp(iloc('a', 2, 10), iloc('a', 2))
-            1
+            >>> iloc('a', 2, 10) > iloc('a', 2)
+            True
 
-            >>> cmp(iloc('b', 2, 10), iloc('a', 2, 10))
-            1
+            >>> iloc('b', 2, 10) > iloc('a', 2, 10)
+            True
 
-            >>> cmp(iloc('a', 2, 10), iloc('a', 2, 10))
-            0
+            >>> iloc('a', 2, 10) == iloc('a', 2, 10)
+            True
 
         '''
         if not isinstance(other, iloc):
             return NotImplemented
-        return cmp(self.path, other.path) or \
-               cmp(self.line, other.line) or \
-               cmp(self.column, other.column)
+        if self.path is None:
+            return other.path is not None
+        if other.path is None or self.path > other.path:
+            return False
+        if self.path < other.path:
+            return True
+        if self.line is None:
+            return other.line is not None
+        if other.line is None or self.line > other.line:
+            return False
+        if self.line < other.line:
+            return True
+        if self.column is None:
+            return other.column is not None
+        if other.column is None or self.column > other.column:
+            return False
+        if self.column < other.column:
+            return True
+        return False
+
+    def __eq__(self, other):
+        if not isinstance(other, iloc):
+            return NotImplemented
+        return self.path == other.path and self.line == other.line and self.column == other.column
 
     def __hash__(self):
         r'''To allow loc objects to be kept in sets.
@@ -457,18 +483,18 @@ class iloc(object):
         '''
         return hash(self.path) ^ hash(self.line) ^ hash(self.column)
 
-class InputError(StandardError):
+class InputError(Exception):
 
     r'''
         >>> e = InputError('wah', loc=iloc('name', 4))
         >>> str(e)
         "'name', line 4: wah"
 
-        >>> e = InputError('wah', char=itext(u'abc', loc=2))
+        >>> e = InputError('wah', char=itext('abc', loc=2))
         >>> str(e)
         '2: wah'
 
-        >>> e = InputError('wah', chars=[itext(u'abc', loc=2), itext(u'def', loc=1)])
+        >>> e = InputError('wah', chars=[itext('abc', loc=2), itext('def', loc=1)])
         >>> str(e)
         '1: wah'
 
@@ -479,7 +505,7 @@ class InputError(StandardError):
     '''
 
     def __init__(self, msg, **kwargs):
-        StandardError.__init__(self, unicode(msg).encode('ascii', 'replace'))
+        Exception.__init__(self, str(msg))
         if len(kwargs) != 1:
             raise TypeError('%s() expects single keyword arg' %
                             self.__class__.__name__)
@@ -494,23 +520,22 @@ class InputError(StandardError):
             elif 'char' in kwargs:
                 self.loc = loc_of(kwargs['char'])
             elif 'lines' in kwargs:
-                self.loc = self._as_line(sorted(self._locs_of(kwargs['lines']))
-                                         [0])
+                self.loc = self._as_line(sorted(self._locs_of(kwargs['lines']))[0])
             elif 'line' in kwargs:
                 self.loc = self._as_line(loc_of(kwargs['line']))
             else:
                 raise TypeError('invalid keyword argument for %s(): "%s="' %
-                                (self.__class__.__name__, kwargs.keys()[0]))
+                                (self.__class__.__name__, list(kwargs.keys())[0]))
         except IndexError:
             pass
 
     @staticmethod
     def _locs_of(objs):
-        return sorted(ifilter(bool, (loc_of(obj) for obj in objs)))
+        return sorted(filter(bool, (loc_of(obj) for obj in objs)))
 
     @staticmethod
     def _as_line(obj):
-        if hasattr(obj, 'as_line') and callable(obj.as_line):
+        if hasattr(obj, 'as_line') and isinstance(obj.as_line, collections.Callable):
             return obj.as_line()
         return obj
 
@@ -518,11 +543,11 @@ class InputError(StandardError):
         r = []
         if self.loc is not None:
             r.append(str(self.loc))
-        r.append(StandardError.__str__(self))
+        r.append(Exception.__str__(self))
         return ': '.join(r)
 
 def loc_of(obj):
-    if hasattr(obj, 'loc') and callable(obj.loc):
+    if hasattr(obj, 'loc') and isinstance(obj.loc, collections.Callable):
         return obj.loc()
     try:
         return obj + 0

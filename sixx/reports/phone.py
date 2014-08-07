@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Phone numbers report.
 '''
@@ -22,13 +22,12 @@ def report_phone_getopt(parser):
 
 def report_phone(options, model, predicate, local):
     if predicate is None:
-        predicate = is_principal & is_other(instance_p(Person) |
-                                            instance_p(Company))
+        predicate = is_principal & is_other(instance_p(Person) | instance_p(Company))
     tkw = {'fax': False, 'bold': True}
     itemiser = Itemiser()
     itemiser.update(model.nodes(is_other(instance_p(NamedNode) & predicate)))
     # Remove entries for families for which one or more of the heads was found.
-    people = filter(lambda node: isinstance(node, Person), itemiser)
+    people = [node for node in itemiser if isinstance(node, Person)]
     for person in people:
         for belongs_to in person.links(outgoing & is_link(Belongs_to)):
             if belongs_to.is_head:
@@ -102,7 +101,7 @@ def report_phone(options, model, predicate, local):
                 subsub = sub.sub()
                 telephones(dept, subsub, **tkw)
                 telephones_org(dept, subsub, **tkw)
-    print unicode(tree).encode(options.encoding, 'replace')
+    print(str(tree))
 
 def telephones_org(org, tree, **tkw):
     for tup in org.find_nodes(outgoing & is_link(Resides_at)):
@@ -132,23 +131,23 @@ def telephones_qual(tup, tree, **kwargs):
             dept = None
             if isinstance(node, Resides_at):
                 qual = qual_home
-                comment.append(unicode(node.residence.lines[0]))
+                comment.append(str(node.residence.lines[0]))
             elif isinstance(node, Works_at):
                 qual = qual_work
                 if node.position and node is tup[-1]:
-                    comment.append(unicode(node.position))
-                comment.append(unicode(node.org))
+                    comment.append(str(node.position))
+                comment.append(str(node.org))
                 if isinstance(node.org, Department):
                     dept = node.org
             elif isinstance(node, Department):
                 dept = node
             elif isinstance(node, Has_department) and node.dept is dept:
                 dept = None
-                comment.append(unicode(node.company))
+                comment.append(str(node.company))
             # If we finished at a Department node, we'd better print the name
             # of the Company too.
             if dept:
                 link = dept.link(incoming & is_link(Has_department))
                 if link:
-                    comment.append(unicode(link.company))
+                    comment.append(str(link.company))
     telephones(tup[-1], tree, qual=qual, comment=', '.join(comment), **kwargs)

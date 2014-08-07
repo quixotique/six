@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''General purpose utilities.
 '''
@@ -18,7 +18,7 @@ def iempty(iterator):
 
     '''
     try:
-        iterator.next()
+        next(iterator)
     except StopIteration:
         return True
     return False

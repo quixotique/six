@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model - Node and Link superclasses, and link predicate algebra.
 '''
@@ -7,6 +7,7 @@ import datetime
 from sixx.text import *
 from sixx.uniq import uniq, uniq_generator
 from sixx.multilang import *
+import collections
 
 __all__ = [
         'Node', 'Link', 'NamedNode',
@@ -53,9 +54,6 @@ class Node(object):
         '''
         if self.place:
             yield self.place
-
-    def __unicode__(self):
-        return unicode(str(self))
 
     def __str__(self):
         return self.__class__.__name__
@@ -232,12 +230,12 @@ class Link(Node):
         if timestamp is not None:
             assert isinstance(timestamp, datetime.date), \
                     'timestamp=%r is not a datetime.date' % timestamp
-        super(Link, self).__init__()
         self.node1 = n1
         self.node2 = n2
+        self.timestamp = timestamp
+        super(Link, self).__init__()
         n1.add_link(self)
         n2.add_link(self)
-        self.timestamp = timestamp
 
     def other(self, node):
         r'''Return the node at other end of the link from the given node.
@@ -277,14 +275,12 @@ class node_predicate(object):
     def __and__(self, other):
         if not isinstance(other, type(self)):
             return NotImplemented
-        return type(self)(lambda node: self._func(node) and
-                                           other._func(node))
+        return type(self)(lambda node: self._func(node) and other._func(node))
 
     def __or__(self, other):
         if not isinstance(other, type(self)):
             return NotImplemented
-        return type(self)(lambda node: self._func(node) or
-                                           other._func(node))
+        return type(self)(lambda node: self._func(node) or other._func(node))
 
     def __invert__(self):
         return type(self)(lambda node: not self._func(node))
@@ -348,36 +344,31 @@ class selection_predicate(object):
             other = self.cast(other)
         except NotImplementedError:
             return NotImplemented
-        return selection_predicate(lambda node, link:
-                            self._func(node, link) and other._func(node, link))
+        return selection_predicate(lambda node, link: self._func(node, link) and other._func(node, link))
 
     def __rand__(self, other):
         try:
             other = self.cast(other)
         except NotImplementedError:
             return NotImplemented
-        return selection_predicate(lambda node, link:
-                            other._func(node, link) and self._func(node, link))
+        return selection_predicate(lambda node, link: other._func(node, link) and self._func(node, link))
 
     def __or__(self, other):
         try:
             other = self.cast(other)
         except NotImplementedError:
             return NotImplemented
-        return selection_predicate(lambda node, link:
-                            self._func(node, link) or other._func(node, link))
+        return selection_predicate(lambda node, link: self._func(node, link) or other._func(node, link))
 
     def __ror__(self, other):
         try:
             other = self.cast(other)
         except NotImplementedError:
             return NotImplemented
-        return selection_predicate(lambda node, link:
-                            other._func(node, link) or self._func(node, link))
+        return selection_predicate(lambda node, link: other._func(node, link) or self._func(node, link))
 
     def __invert__(self):
-        return selection_predicate(lambda node, link:
-                            not self._func(node, link))
+        return selection_predicate(lambda node, link: not self._func(node, link))
 
 @selection_predicate
 def outgoing(node, link):
@@ -441,7 +432,7 @@ def is_other(pred):
     r'''Return a selection predicate that applies the given node predicate to
     the node at the other end of the link.
     '''
-    assert isinstance(pred, node_predicate)
+    assert isinstance(pred, node_predicate), 'pred=%r' % (pred,)
     return selection_predicate(lambda node, link: pred(link.other(node)))
 
 def is_link(pred):
@@ -645,7 +636,7 @@ class NamedNode(Node):
         super(NamedNode, self).__init__()
         aka = list(uniq(aka)) if aka else []
         for a in aka:
-            assert isinstance(a, (basestring, multilang))
+            assert isinstance(a, (str, multilang))
         self.aka = aka
 
     def names(self, with_aka=True):
@@ -671,18 +662,15 @@ class NamedNode(Node):
         Otherwise, a simple string matches the text if it starts with the text.
         '''
         for name in self.names():
-            if hasattr(name, 'matches') and callable(name.matches):
+            if hasattr(name, 'matches') and isinstance(name.matches, collections.Callable):
                 if name.matches(text):
                     return True
             elif name == text:
                 return True
         return False
 
-    def __unicode__(self):
-        return unicode(self.names().next())
-
     def __str__(self):
-        return str(unicode(self))
+        return str(next(self.names()))
 
 def name_imatches(text):
     r'''Return a node predicate that selects named nodes whose name(s) contains
@@ -694,7 +682,7 @@ def name_imatches(text):
         if not isinstance(node, NamedNode):
             return False
         for name in node.names():
-            if hasattr(name, 'imatches') and callable(name.imatches):
+            if hasattr(name, 'imatches') and isinstance(name.imatches, collections.Callable):
                 if name.imatches(itext):
                     return True
             elif itext in text_match_key(name):

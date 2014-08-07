@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Booklet report.
 '''
@@ -83,9 +83,9 @@ def report_book(options, model, predicate, local):
                     refs[person] = belongs_to[0].family
     # Form the sorted index of all the top-level entries in the report, and
     # the 'refs' dictionary.
-    toplevel = sorted(chain(itemiser.items(),
-                            itemiser.alias_items(refs.iteritems())))
-    refs.update(zip(itemiser, itemiser))
+    toplevel = sorted(chain(list(itemiser.items()),
+                            itemiser.alias_items(iter(refs.items()))))
+    refs.update(list(zip(itemiser, itemiser)))
     # Remove unnecessary references.
     cull_references(toplevel)
     # Format the report.
@@ -191,14 +191,14 @@ continue_style=ParagraphStyle(name='Continue',
 
 qual_home = multilang(en='home', es='casa')
 qual_work = multilang(en='work', es='trab')
-NBSP = u'\u00a0'
-EN_DASH = u'\u2013'
-EM_DASH = u'\u2014'
-RIGHT_ARROW = u'\u2192'
-BLACK_DIAMOND = u'\u25c6'
-HEAVY_VERTICAL_BAR = u'\u275a'
-EMAIL_BULLET = BLACK_DIAMOND_MINUS_WHITE_X = u'\u2756'
-TELEPHONE_BULLET = BLACK_TELEPHONE = u'\u260e'
+NBSP = '\u00a0'
+EN_DASH = '\u2013'
+EM_DASH = '\u2014'
+RIGHT_ARROW = '\u2192'
+BLACK_DIAMOND = '\u25c6'
+HEAVY_VERTICAL_BAR = '\u275a'
+EMAIL_BULLET = BLACK_DIAMOND_MINUS_WHITE_X = '\u2756'
+TELEPHONE_BULLET = BLACK_TELEPHONE = '\u260e'
 
 class Booklet(object):
 
@@ -232,8 +232,8 @@ class Booklet(object):
         assert best_n >= 1
         assert best_paper_size
         frames = []
-        for iy in xrange(best_np[1]):
-            for ix in xrange(best_np[0]):
+        for iy in range(best_np[1]):
+            for ix in range(best_np[0]):
                 frames.append(CutFrame(
                     x1= best_paper_margins[0] +
                             ix * (self.page_size.size[0] + self.gutter),
@@ -253,8 +253,8 @@ class Booklet(object):
                     initialSection=self.sections[self.section] if self.sections
                                    else 'A-Z',
                     headerLeft=time.strftime(r'%-d %b %Y'),
-                    headerRight=unicode(multilang(en='Page', es=u'Página')) +
-                                u' <seq id="page" />',
+                    headerRight=str(multilang(en='Page', es='PÃ¡gina')) +
+                                ' <seq id="page" />',
                     pagesize=best_paper_size,
                     pageTemplates=[self.page],
                     leftMargin=0, rightMargin=0,
@@ -414,43 +414,43 @@ class Booklet(object):
                   style=name_style, akastyle=aka_style, refstyle=ref_style,
                   comstyle=name_comment_style):
         names = uniq(names)
-        first = names.next()
+        first = next(names)
         if bold:
-            startbold, endbold = u'<b>', u'</b>'
+            startbold, endbold = '<b>', '</b>'
         else:
-            startbold, endbold = u'', u''
+            startbold, endbold = '', ''
         if bullet:
             bullet = bullet + ' '
         bulletWidth = stringWidth(bullet, style.fontName, style.fontSize)
         if hasattr(first, 'sortsplit'):
             pre, sort, post = first.sortsplit()
-            name = u''.join([escape_xml(pre),
+            name = ''.join([escape_xml(pre),
                              startbold, escape_xml(sort), endbold,
                              escape_xml(post)])
         else:
-            name = startbold + escape_xml(unicode(first)) + endbold
-        first = unicode(first)
+            name = startbold + escape_xml(str(first)) + endbold
+        first = str(first)
         para = [prefix, name, suffix]
-        self._para(u''.join(para), style, bullet=bullet)
+        self._para(''.join(para), style, bullet=bullet)
         # Join AKA names onto the end of the name.
         para = []
-        for aka in map(unicode, names):
+        for aka in map(str, names):
             if aka != first:
-                para += [u' =', NBSP, escape_xml(aka)]
+                para += [' =', NBSP, escape_xml(aka)]
         if para:
-            self._para(u''.join(para), akastyle, returnIndent=bulletWidth,
+            self._para(''.join(para), akastyle, returnIndent=bulletWidth,
                        join_to_prev=True)
         # Join reference arrow and text onto end of name.
         if refname:
             para = [' ', RIGHT_ARROW, NBSP, escape_xml(refname)]
-            self._para(u''.join(para), refstyle, returnIndent=bulletWidth,
+            self._para(''.join(para), refstyle, returnIndent=bulletWidth,
                        join_to_prev=True)
         # Join comments onto end of name.
         para = []
         for c in comments:
-            para += [' ', EN_DASH, NBSP, escape_xml(unicode(c))]
+            para += [' ', EN_DASH, NBSP, escape_xml(str(c))]
         if para:
-            self._para(u''.join(para), comstyle, returnIndent=bulletWidth,
+            self._para(''.join(para), comstyle, returnIndent=bulletWidth,
                        join_to_prev=True)
 
     def add_person(self, per, link=None, show_family=True,
@@ -458,8 +458,8 @@ class Booklet(object):
         self.add_comments(per)
         if per.birthday():
             self._is_not_empty()
-            self._para(unicode(multilang(en='Birthday', es='Fecha nac.')) +
-                           ': ' + unicode(per.birthday()),
+            self._para(str(multilang(en='Birthday', es='Fecha nac.')) +
+                           ': ' + str(per.birthday()),
                        birthday_style)
         self.indent += 1
         self.add_addresses(per)
@@ -478,7 +478,7 @@ class Booklet(object):
                     self.add_family(link.family, link, show_members=False)
                     self.indent -= 1
                 else:
-                    self.add_names([link.family.sort_keys().next()],
+                    self.add_names([next(link.family.sort_keys())],
                                    bullet=RIGHT_ARROW, bold=False,
                                    comments=self.all_comments(link))
                     self.indent += 2
@@ -489,7 +489,7 @@ class Booklet(object):
                 position = ''
                 if link.position:
                     self._is_not_empty()
-                    position = escape_xml(unicode(link.position)) + ', '
+                    position = escape_xml(str(link.position)) + ', '
                 # If the organisation/residence where this person works has no
                 # top level entry or has a top level reference to this person,
                 # then list the organisation/residence here.  Otherwise, just
@@ -499,8 +499,8 @@ class Booklet(object):
                     if isinstance(link.org, Residence):
                         self.indent += 1
                         self.add_address(link, link.org,
-                                prefix=u'<i>' + unicode(qual_work).capitalize() +
-                                       u':</i> ')
+                                prefix='<i>' + str(qual_work).capitalize() +
+                                       ':</i> ')
                         self.indent -= 1
                     else:
                         self.add_names(link.org.names(), bullet=EM_DASH,
@@ -511,7 +511,7 @@ class Booklet(object):
                                               show_workers=False)
                         self.indent -= 1
                 else:
-                    self.add_names([link.org.sort_keys().next()],
+                    self.add_names([next(link.org.sort_keys())],
                                    bullet=RIGHT_ARROW, bold=False,
                                    prefix=position,
                                    comments=self.all_comments(link))
@@ -557,19 +557,19 @@ class Booklet(object):
                     if not self.if_not_empty(add_member):
                         omitted.append(link)
                 elif top is link.person:
-                    self.add_names([link.person.sort_keys().next()],
+                    self.add_names([next(link.person.sort_keys())],
                                    bullet=RIGHT_ARROW,
                                    comments=self.all_comments(link))
                     self.indent += 2
                     self.add_contacts(link, context=At_home)
                     self.indent -= 2
                 else:
-                    self.add_names([link.person.sort_keys().next()],
+                    self.add_names([next(link.person.sort_keys())],
                                    bullet=EM_DASH,
                                    comments=self.all_comments(link))
                     self.indent += 2
                     self.add_contacts(link, context=At_home)
-                    self.add_names([top.sort_keys().next()],
+                    self.add_names([next(top.sort_keys())],
                                    bullet=RIGHT_ARROW, bold=False)
                     self.indent -= 2
                 self.end_keep_together()
@@ -597,7 +597,7 @@ class Booklet(object):
                 assert parent is not None
                 if parent.company in self.refs:
                     self.start_keep_together()
-                    self.add_names([parent.company.sort_keys().next()],
+                    self.add_names([next(parent.company.sort_keys())],
                                    bullet=RIGHT_ARROW, bold=False,
                                    comments=self.all_comments(parent))
                     parent = None
@@ -606,7 +606,7 @@ class Booklet(object):
         self.add_contacts(org, link)
         if parent:
             self.start_keep_together()
-            self.add_names([parent.company.sort_keys().next()],
+            self.add_names([next(parent.company.sort_keys())],
                            bullet=EM_DASH, bold=True,
                            comments=self.all_comments(parent))
             self.add_organisation(parent.company, parent,
@@ -653,7 +653,7 @@ class Booklet(object):
             position = ''
             if link.position:
                 self._is_not_empty()
-                position = ', ' + escape_xml(unicode(link.position))
+                position = ', ' + escape_xml(str(link.position))
             if top is com or (top is None and (link.is_head or
                                                self.predicate(link))):
                 self._is_not_empty()
@@ -662,9 +662,9 @@ class Booklet(object):
                 # family.
                 for linkf in link.person.links(outgoing & is_link(Belongs_to)):
                     if linkf.family in self.refs:
-                        self.add_names([link.person.sort_keys().next()],
+                        self.add_names([next(link.person.sort_keys())],
                                        suffix=position,
-                                       refname=linkf.family.sort_keys().next(),
+                                       refname=next(linkf.family.sort_keys()),
                                        bullet=RIGHT_ARROW,
                                        comments=self.all_comments(link))
                         self.indent += 2
@@ -679,7 +679,7 @@ class Booklet(object):
                     self.add_person(link.person, link, show_work=False)
                     self.indent -= 1
             elif top is not None:
-                name = link.person.sort_keys().next()
+                name = next(link.person.sort_keys())
                 if top is link.person:
                     self.add_names([name], bullet=RIGHT_ARROW, suffix=position,
                                    comments=self.all_comments(link))
@@ -688,7 +688,7 @@ class Booklet(object):
                     self.indent -= 2
                 else:
                     self.add_names([name], bullet=EM_DASH,
-                                   refname=top.sort_keys().next(),
+                                   refname=next(top.sort_keys()),
                                    bold=True, suffix=position,
                                    comments=self.all_comments(link))
                     self.indent += 2
@@ -704,14 +704,14 @@ class Booklet(object):
     def add_comments(self, *nodes):
         for com in self.all_comments(*nodes):
             self._is_not_empty()
-            self._para(escape_xml(unicode(com)), comment_style)
+            self._para(escape_xml(str(com)), comment_style)
 
     def add_contacts(self, *nodes, **kwargs):
         context = kwargs.pop('context', None)
         if kwargs:
             raise TypeError(
                 "%r is ann invalid keyword argument for this function" %
-                    kwargs.iterkeys().next())
+                    next(iter(kwargs.keys())))
         contacts = []
         for node in filter(bool, nodes):
             for typ in (Has_postal_address,
@@ -725,55 +725,55 @@ class Booklet(object):
                     elif isinstance(link, Has_email):
                         bullet = EMAIL_BULLET
                         cnode = link.email
-                        contact = escape_xml(str(cnode).replace(u' ', NBSP))
+                        contact = escape_xml(str(cnode).replace(' ', NBSP))
                         if isinstance(link, At_work):
                             if context != At_work:
-                                label = unicode(qual_work).capitalize()
+                                label = str(qual_work).capitalize()
                         elif isinstance(link, At_home):
                             if context != At_home:
-                                label = unicode(qual_home).capitalize()
+                                label = str(qual_home).capitalize()
                         if label:
                             label = '<i>' + label + '</i>'
                     else:
                         bullet = TELEPHONE_BULLET
                         cnode = link.tel
-                        contact = (u'<b>' +
-                            escape_xml(unicode(link.tel.relative(self.local))) +
-                            u'</b>')
+                        contact = ('<b>' +
+                            escape_xml(str(link.tel.relative(self.local))) +
+                            '</b>')
                         if isinstance(link, Has_fixed):
                             if isinstance(link, At_work):
-                                label = unicode(qual_work).capitalize()
+                                label = str(qual_work).capitalize()
                             elif isinstance(link, At_home):
-                                label = unicode(qual_home).capitalize()
+                                label = str(qual_home).capitalize()
                             else:
-                                label = unicode(multilang(en='Tel', es=u'Tlf'))
+                                label = str(multilang(en='Tel', es='Tlf'))
                         else:
                             if isinstance(link, Has_mobile):
-                                label = unicode(multilang(en='Mob', es=u'Móv'))
+                                label = str(multilang(en='Mob', es='MÃ³v'))
                             else:
                                 assert isinstance(link, Has_fax)
-                                label = u'Fax'
+                                label = 'Fax'
                             if isinstance(link, At_work):
-                                label += ' ' + unicode(qual_work)
+                                label += ' ' + str(qual_work)
                             elif isinstance(link, At_home):
-                                label += ' ' + unicode(qual_home)
+                                label += ' ' + str(qual_home)
                     comments = []
                     for n in cnode, link:
                         comment = getattr(n, 'comment', None)
                         if comment:
                             comments.append(comment)
                     if comments:
-                        comments = (NBSP + u'<i>' +
-                            u'; '.join(escape_xml(unicode(c)) for c in comments) +
-                            u'</i>')
+                        comments = (NBSP + '<i>' +
+                            '; '.join(escape_xml(str(c)) for c in comments) +
+                            '</i>')
                     else:
                         comments = ''
                     if label:
-                        label += u': '
-                    label = bullet + u' ' + label
-                    contacts.append((label + contact).replace(u' ', NBSP) +
+                        label += ': '
+                    label = bullet + ' ' + label
+                    contacts.append((label + contact).replace(' ', NBSP) +
                                     comments)
-        self._para(u' '.join(contacts), contacts_style)
+        self._para(' '.join(contacts), contacts_style)
 
     def add_addresses(self, who):
         # TODO: Located_at
@@ -782,8 +782,7 @@ class Booklet(object):
 
     def add_address(self, link, addr, prefix=''):
         self._is_not_empty()
-        self._para(prefix + escape_xml(addr.as_unicode(with_country=False)),
-                   address_style)
+        self._para(prefix + escape_xml(addr.as_string(with_country=False)), address_style)
         self.indent += 1
         self.add_comments(link, addr)
         self.add_contacts(link, addr)

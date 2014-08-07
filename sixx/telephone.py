@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model - telephone numbers.
 '''
@@ -66,9 +66,6 @@ class Telephone(Node):
         self.place = place
         self.local = local
         self.acode = acode
-
-    def __unicode__(self):
-        return unicode(str(self))
 
     def __str__(self):
         return self.absolute()
@@ -179,7 +176,7 @@ class Telephone(Node):
             >>> w = World(countries=[au, us, es])
 
             >>> Telephone.parse('+1 234 567-8901   wah', world=w)
-            (Telephone(place=Place(Country('US', 'en_US', '1', multilang('U.S.A.'), aprefix='1')), acode='234', local='567-8901'), u'wah')
+            (Telephone(place=Place(Country('US', 'en_US', '1', multilang('U.S.A.'), aprefix='1')), acode='234', local='567-8901'), 'wah')
 
             >>> Telephone.parse('+1 234 567-8901', world=w)
             (Telephone(place=Place(Country('US', 'en_US', '1', multilang('U.S.A.'), aprefix='1')), acode='234', local='567-8901'), None)
@@ -189,60 +186,60 @@ class Telephone(Node):
 
             >>> Telephone.parse('+61 2 567-8901', world=w, place=Place(us))
             Traceback (most recent call last):
-            InputError: telephone number must be in U.S.A.
+            sixx.input.InputError: telephone number must be in U.S.A.
 
             >>> Telephone.parse('+1 234 567-8901', world=w, default_place=Place(us))
             (Telephone(place=Place(Country('US', 'en_US', '1', multilang('U.S.A.'), aprefix='1')), acode='234', local='567-8901'), None)
 
             >>> Telephone.parse('234 567-8901 wah', world=w)
             Traceback (most recent call last):
-            InputError: missing country code
+            sixx.input.InputError: missing country code
 
             >>> Telephone.parse('234 567-8901 wah', world=w, place=Place(us))
             Traceback (most recent call last):
-            InputError: missing area prefix
+            sixx.input.InputError: missing area prefix
 
             >>> Telephone.parse('1234 567-8901 wah', world=w, place=Place(us))
-            (Telephone(place=Place(Country('US', 'en_US', '1', multilang('U.S.A.'), aprefix='1')), acode='234', local='567-8901'), u'wah')
+            (Telephone(place=Place(Country('US', 'en_US', '1', multilang('U.S.A.'), aprefix='1')), acode='234', local='567-8901'), 'wah')
 
             >>> Telephone.parse('567-8901 wah', world=w, place=Place(us))
             Traceback (most recent call last):
-            InputError: missing area code
+            sixx.input.InputError: missing area code
 
             >>> Telephone.parse('1567-8901 wah', world=w, place=Place(us))
-            (Telephone(place=Place(Country('US', 'en_US', '1', multilang('U.S.A.'), aprefix='1')), local='567-8901'), u'wah')
+            (Telephone(place=Place(Country('US', 'en_US', '1', multilang('U.S.A.'), aprefix='1')), local='567-8901'), 'wah')
 
             >>> Telephone.parse('1567-8901 wah', world=w, default_place=Place(us))
-            (Telephone(place=Place(Country('US', 'en_US', '1', multilang('U.S.A.'), aprefix='1')), local='567-8901'), u'wah')
+            (Telephone(place=Place(Country('US', 'en_US', '1', multilang('U.S.A.'), aprefix='1')), local='567-8901'), 'wah')
 
             >>> Telephone.parse('2 345-6789 wah', world=w, place=Place(au))
             Traceback (most recent call last):
-            InputError: missing area prefix
+            sixx.input.InputError: missing area prefix
 
             >>> Telephone.parse('0 345-6789 wah', world=w, place=Place(au))
             Traceback (most recent call last):
-            InputError: missing area code
+            sixx.input.InputError: missing area code
 
             >>> Telephone.parse('02 345-6789 wah', world=w, place=Place(au))
-            (Telephone(place=Place(Country('AU', 'en_AU', '61', multilang('Australia'), aprefix='0', sprefix='1')), acode='2', local='345-6789'), u'wah')
+            (Telephone(place=Place(Country('AU', 'en_AU', '61', multilang('Australia'), aprefix='0', sprefix='1')), acode='2', local='345-6789'), 'wah')
 
             >>> Telephone.parse('02 345-6789 wah', world=w, place=Place(nsw))
-            (Telephone(place=Place(Area(Country('AU', 'en_AU', '61', multilang('Australia'), aprefix='0', sprefix='1'), '2', multilang('NSW'), fullname=multilang(en='New South Wales'))), acode='2', local='345-6789'), u'wah')
+            (Telephone(place=Place(Area(Country('AU', 'en_AU', '61', multilang('Australia'), aprefix='0', sprefix='1'), '2', multilang('NSW'), fullname=multilang(en='New South Wales'))), acode='2', local='345-6789'), 'wah')
 
             >>> Telephone.parse('02 345-6789 wah', world=w, place=Place(sa))
             Traceback (most recent call last):
-            InputError: telephone number must be in SA
+            sixx.input.InputError: telephone number must be in SA
 
             >>> Telephone.parse('wah', world=w)
             Traceback (most recent call last):
-            InputError: malformed telephone number
+            sixx.input.InputError: malformed telephone number
 
         '''
         m = class_._re_parse.match(text)
         if m is None or not m.group('local'):
             raise InputError('malformed telephone number', char=text)
         local = m.group('local')
-        comment = unicode(text[m.end():]).strip() or None
+        comment = str(text[m.end():]).strip() or None
         ccode = m.group('ccode')
         # The telephone number needs a country code, either explicitly or
         # supplied by 'place'.
@@ -349,7 +346,7 @@ class Has_phone(Link):
         assert isinstance(who, (Person, Family, Organisation, Residence,
                                 Resides_at, Located_at, Works_at))
         assert isinstance(tel, Telephone)
-        assert comment is None or isinstance(comment, basestring)
+        assert comment is None or isinstance(comment, str)
         super(Has_phone, self).__init__(who, tel, timestamp=timestamp)
         self.who = who
         self.tel = tel

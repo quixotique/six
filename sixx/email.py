@@ -1,9 +1,9 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model - email addresses.
 '''
 
-from __future__ import absolute_import
+
 import re
 from sixx.input import InputError
 from sixx.node import *
@@ -37,13 +37,10 @@ class Email(Node):
     def __str__(self):
         return self.address
 
-    def __unicode__(self):
-        return unicode(self.address)
-
     def format(self, name=None, encoding='ascii'):
         r = []
         if name:
-            name = unicode(name)
+            name = str(name)
             if encoding:
                 try:
                     name = name.encode(encoding)
@@ -86,27 +83,27 @@ class Email(Node):
     @classmethod
     def parse(class_, text, world=None, place=None, default_place=None):
         r'''
-            >>> Email.parse(u'andrewb@zip.com.au   wah')
-            (Email('andrewb@zip.com.au'), u'wah')
+            >>> Email.parse('andrewb@zip.com.au   wah')
+            (Email('andrewb@zip.com.au'), 'wah')
 
-            >>> Email.parse(u'andrewb@zip.com.au   wäh')
-            (Email('andrewb@zip.com.au'), u'w\xe4h')
+            >>> Email.parse('andrewb@zip.com.au   wÃ¤h')
+            (Email('andrewb@zip.com.au'), 'w\xe4h')
 
-            >>> Email.parse(u'andréwb@zip.com.au')
+            >>> Email.parse('andrÃ©wb@zip.com.au')
             Traceback (most recent call last):
-            InputError: malformed email address
+            sixx.input.InputError: malformed email address
 
             >>> Email.parse('wah')
             Traceback (most recent call last):
-            InputError: malformed email address
+            sixx.input.InputError: malformed email address
 
             >>> Email.parse('wah@.com')
             Traceback (most recent call last):
-            InputError: malformed email address
+            sixx.input.InputError: malformed email address
 
             >>> Email.parse('@bar.com')
             Traceback (most recent call last):
-            InputError: malformed email address
+            sixx.input.InputError: malformed email address
 
             >>> Email.parse('foo@bar')
             (Email('foo@bar'), None)
@@ -144,9 +141,6 @@ class URI(Node):
 
     def __str__(self):
         return self.uri
-
-    def __unicode__(self):
-        return unicode(self.uri)
 
     # These taken directly from RFC 2396.
     _alpha = r'[A-Za-z]'
@@ -192,8 +186,8 @@ class URI(Node):
     @classmethod
     def parse(class_, text, world=None, place=None, default_place=None):
         r'''
-            >>> URI.parse(u'http://www.zip.com.au/~andrewb/   wah')
-            (URI('http://www.zip.com.au/~andrewb/'), u'wah')
+            >>> URI.parse('http://www.zip.com.au/~andrewb/   wah')
+            (URI('http://www.zip.com.au/~andrewb/'), 'wah')
 
         '''
         m = class_._re_uri.match(text)
@@ -213,7 +207,7 @@ class Has_email(Link):
         assert isinstance(who, (Person, Family, Organisation, Works_at,
                                 Resides_at))
         assert isinstance(email, Email)
-        assert comment is None or isinstance(comment, basestring)
+        assert comment is None or isinstance(comment, str)
         super(Has_email, self).__init__(who, email, timestamp=timestamp)
         self.who = who
         self.email = email
@@ -232,7 +226,7 @@ class Has_web_page(Link):
         assert isinstance(who, (Person, Family, Organisation, Works_at,
                                 Resides_at))
         assert isinstance(uri, URI)
-        assert comment is None or isinstance(comment, basestring)
+        assert comment is None or isinstance(comment, str)
         super(Has_web_page, self).__init__(who, uri, timestamp=timestamp)
         self.who = who
         self.uri = uri

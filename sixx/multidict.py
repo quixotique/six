@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Multi-value dictionary.
 '''
@@ -103,7 +103,7 @@ class multidict(object):
             >>> d.clear()
             >>> len(d)
             0
-            >>> d.keys()
+            >>> list(d.keys())
             []
         '''
         self.__data.clear()
@@ -131,7 +131,7 @@ class multidict(object):
             >>> d.has_key(4)
             False
         '''
-        return self.__data.has_key(key)
+        return key in self.__data
 
     def __contains__(self, key):
         r'''Return true if the multidict contains one or more values for the
@@ -146,27 +146,29 @@ class multidict(object):
         return key in self.__data
 
     def __iter__(self):
-        r'''Same as iterkeys().
+        r'''Same as keys().
         '''
-        return self.iterkeys()
+        return iter(self.keys())
 
     def items(self):
-        r'''Return a list of (key, (value,...)) tuples in undefined order.
+        r'''Return an iterable over (key, (value,...)) tuples in undefined order.
 
             >>> d = multidict(((1, 'a'), (2, 'b'), (3, 'c'), (1, 'A')))
             >>> sorted(d.items())
             [(1, 'A'), (1, 'a'), (2, 'b'), (3, 'c')]
         '''
-        return list(self.iteritems())
+        for key, values in self.__data.items():
+            for value in values:
+                yield key, value
 
     def keys(self):
-        r'''Return a list of all keys, in undefined order.
+        r'''Return an iterable over all keys, in undefined order.
 
             >>> d = multidict(((1, 'a'), (2, 'b'), (3, 'c'), (1, 'A')))
             >>> sorted(d.keys())
             [1, 2, 3]
         '''
-        return list(self.iterkeys())
+        return self.__data.keys()
 
     def update(self, *args, **kwargs):
         r'''Add key, value pairs to the multidict, equivalent to doing
@@ -202,13 +204,13 @@ class multidict(object):
                 raise TypeError('update expected at most 1 arguments, got %d' %
                                 len(args))
             try:
-                for key, value in args[0].iteritems():
+                for key, value in args[0].items():
                     self[key] = value
             except AttributeError:
                 for key, value in args[0]:
                     self[key] = value
         else:
-            for key, value in kwargs.iteritems():
+            for key, value in kwargs.items():
                 self[key] = value
 
     @classmethod
@@ -233,13 +235,15 @@ class multidict(object):
         return md
 
     def values(self):
-        r'''Return a list of values in undefined order.
+        r'''Return an iterator over values in undefined order.
 
             >>> d = multidict(((1, 'a'), (2, 'b'), (3, 'c'), (1, 'A')))
             >>> sorted(d.values())
             ['A', 'a', 'b', 'c']
         '''
-        return list(self.itervalues())
+        for values in self.__data.values():
+            for value in values:
+                yield value
 
     def get(self, key, value=None):
         r'''Return self[key] if key is in self, otherwise return value.
@@ -317,21 +321,8 @@ class multidict(object):
         if self.__len == 0:
             raise KeyError('popitem(): multidict is empty')
         assert len(self.__data) != 0
-        key = self.__data.iterkeys().next()
+        key = next(iter(self.__data.keys()))
         return key, self.pop(key)
-
-    def iteritems(self):
-        for key, values in self.__data.iteritems():
-            for value in values:
-                yield key, value
-
-    def iterkeys(self):
-        return self.__data.iterkeys()
-
-    def itervalues(self):
-        for values in self.__data.itervalues():
-            for value in values:
-                yield value
 
     def __eq__(self, other):
         r'''Return true if 'other' is a mapping with the same length and
@@ -340,8 +331,8 @@ class multidict(object):
         try:
             if len(other) != self.__len:
                 return False
-            for key, value in other.iteritems():
-                if value not in self.__data[key]:
+            for key, value in other.items():
+                if key not in self.__data or value not in self.__data[key]:
                     return False
             return True
         except AttributeError:
@@ -352,3 +343,11 @@ class multidict(object):
         if ret is not NotImplemented:
             ret = not ret
         return ret
+
+    def __hash__(self):
+        h = 0
+        for key, values in self.__data.items():
+            h ^= hash(key)
+            for value in values:
+                h ^= hash(value)
+        return h

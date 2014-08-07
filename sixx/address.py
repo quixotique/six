@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model - addresses.
 '''
@@ -17,8 +17,8 @@ class Address(Node):
         >>> isinstance(au, Node)
         True
         >>> a = Address(['50 Clifton St', 'Maylands SA 5069'], Place(au))
-        >>> unicode(a)
-        u'50 Clifton St; Maylands SA 5069; AUSTRALIA'
+        >>> str(a)
+        '50 Clifton St; Maylands SA 5069; AUSTRALIA'
     '''
 
     def __init__(self, lines, place):
@@ -29,24 +29,21 @@ class Address(Node):
         from sixx.links import Is_in
         Is_in(self, place)
 
-    def as_unicode(self, with_country=True):
+    def as_string(self, with_country=True):
         lines = list(self.lines)
         if with_country:
-            lines.append(unicode(self.place.country).upper())
-        return u'; '.join(lines)
-
-    def __unicode__(self):
-        return self.as_unicode(with_country=True)
+            lines.append(str(self.place.country).upper())
+        return '; '.join(lines)
 
     def __str__(self):
-        return str(unicode(self))
+        return self.as_string(with_country=True)
 
     def __repr__(self):
         return '%s(lines=%r, place=%r)' % (self.__class__.__name__,
                 self.lines, self.place)
 
     def absolute(self):
-        return self.as_unicode(with_country=True)
+        return self.as_string(with_country=True)
 
     def relative(self, place):
         r'''
@@ -57,14 +54,14 @@ class Address(Node):
             >>> w = World(countries=[au, es])
 
             >>> a = Address(['50 Clifton St', 'Maylands SA 5069'], Place(sa))
-            >>> unicode(a)
-            u'50 Clifton St; Maylands SA 5069; AUSTRALIA'
+            >>> str(a)
+            '50 Clifton St; Maylands SA 5069; AUSTRALIA'
             >>> a.relative(Place(sa))
-            u'50 Clifton St; Maylands SA 5069'
+            '50 Clifton St; Maylands SA 5069'
             >>> a.relative(Place(au))
-            u'50 Clifton St; Maylands SA 5069'
+            '50 Clifton St; Maylands SA 5069'
             >>> a.relative(Place(es))
-            u'50 Clifton St; Maylands SA 5069; AUSTRALIA'
+            '50 Clifton St; Maylands SA 5069; AUSTRALIA'
 
         '''
         country = None
@@ -72,7 +69,7 @@ class Address(Node):
             assert isinstance(place, Place)
             country = place.country
         if place and self.place.country is place.country:
-            return self.as_unicode(with_country=False)
+            return self.as_string(with_country=False)
         return self.absolute()
 
     def __hash__(self):
@@ -112,7 +109,7 @@ class Address(Node):
         place.area, otherwise InputError is raised.
 
             >>> w = World()
-            >>> es = Country('ES', 'es', '34', multilang(en='Spain', es=u'España'))
+            >>> es = Country('ES', 'es', '34', multilang(en='Spain', es=u'EspaÃ±a'))
             >>> w.add(es)
             >>> au = Country('AU', 'en', '61', multilang('Australia'))
             >>> sa = Area(au, '8', multilang('SA'), multilang('South Australia'))
@@ -139,31 +136,31 @@ class Address(Node):
             >>> b == a
             True
 
-            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, place=Place(au))
+            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÃ‘A', w, place=Place(au))
             Traceback (most recent call last):
-            InputError: address must be in Australia
+            sixx.input.InputError: address must be in Australia
 
-            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, default_place=Place(au))
+            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÃ‘A', w, default_place=Place(au))
             >>> a.only_place().country is es
             True
             >>> a.only_place().area is None
             True
 
-            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, place=Place(sa))
+            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÃ‘A', w, place=Place(sa))
             Traceback (most recent call last):
-            InputError: address must be in Australia
+            sixx.input.InputError: address must be in Australia
 
             >>> a, com = Address.parse('1A Campbell St, Balmain NSW 2041', w, place=Place(sa))
             Traceback (most recent call last):
-            InputError: address must be in SA
+            sixx.input.InputError: address must be in SA
 
-            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÑA', w, default_place=Place(sa))
+            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 Carranque Toledo; ESPAÃ‘A', w, default_place=Place(sa))
             >>> a.only_place().country is es
             True
             >>> a.only_place().area is None
             True
 
-            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 SA; ESPAÑA', w, default_place=Place(sa))
+            >>> a, com = Address.parse(u'C/ Bienandanza, 6; 45216 SA; ESPAÃ‘A', w, default_place=Place(sa))
             >>> a.only_place().country is es
             True
             >>> a.only_place().area is None
@@ -172,7 +169,7 @@ class Address(Node):
         The string representation of an Address should, of course, parse to an
         equivalent Address object, given the same world:
 
-            >>> Address.parse(unicode(a), w)[0] == a
+            >>> Address.parse(str(a), w)[0] == a
             True
 
         @param text: the text to parse
@@ -183,9 +180,9 @@ class Address(Node):
             attribute
         '''
         if ';' in text:
-            lines = filter(len, (s.strip() for s in text.split(';')))
+            lines = list(filter(len, (s.strip() for s in text.split(';'))))
         else:
-            lines = filter(len, (s.strip() for s in text.split(',')))
+            lines = list(filter(len, (s.strip() for s in text.split(','))))
         assert len(lines) != 0
         country = world.lookup_country(lines[-1], None)
         if country is not None:
@@ -233,8 +230,8 @@ class Location(Address):
         True
         >>> a = Address(['50 Clifton St', 'Maylands SA 5069'], Place(au))
         >>> a1 = Location(['The Stately Manor'], a)
-        >>> unicode(a1)
-        u'The Stately Manor; 50 Clifton St; Maylands SA 5069; AUSTRALIA'
+        >>> str(a1)
+        'The Stately Manor; 50 Clifton St; Maylands SA 5069; AUSTRALIA'
     '''
 
     def __init__(self, qualifying_lines, orig_address):

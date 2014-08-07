@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r"""Robust enumeration type.
 
@@ -199,7 +199,7 @@ Enum elements can be pickled and unpickled using protocol 2:
 
     >>> pickle.loads(pickle.dumps(X.b, 0)) is X.b
     Traceback (most recent call last):
-    UnpicklingError: sixx.enum.Enum does not support this protocol
+    _pickle.UnpicklingError: sixx.enum.Enum does not support this protocol
 
 Every element has an immutable 'e_name' attribute that is its bare name:
 
@@ -254,12 +254,10 @@ class _enum_meta(type):
         for name in cls._names:
             yield getattr(cls, name)
 
-class Enum(object):
+class Enum(object, metaclass=_enum_meta):
 
     r'''Superclass of all enumeration types.
     '''
-
-    __metaclass__ = _enum_meta
     _names = ()
 
     def __new__(cls, *args):
@@ -316,7 +314,7 @@ class Enum(object):
         if names in globals():
             return globals()[names]
         name = '%s(%s)' % (cls.__name__, ', '.join(map(repr, names)))
-        cls = cls.__metaclass__(name, (Enum,), {'_names': names})
+        cls = type(cls)(name, (Enum,), {'_names': names})
         globals()[names] = cls
         return cls
 

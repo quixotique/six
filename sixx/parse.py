@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data file parsing.
 '''
@@ -8,9 +8,10 @@ import codecs
 from sixx.input import *
 from sixx.multidict import multidict
 from sixx.struct import struct
+import collections
 
 def lines(path):
-    firstline = file(path).readline()
+    firstline = open(path).readline()
     m = re.search(r'coding[=:]\s*([-\w.]+)', firstline)
     encoding = 'ascii'
     if m:
@@ -20,7 +21,7 @@ def lines(path):
         for line in codecs.open(path, 'r', encoding):
             yield itext(line, loc=iloc(path=path, line=lnum, column=1))
             lnum += 1
-    except UnicodeDecodeError, e:
+    except UnicodeDecodeError as e:
         raise InputError(e, loc=iloc(path=path, line=lnum))
 
 def remove_comments(lines):
@@ -96,6 +97,8 @@ def controls(block, dispatch):
             try:
                 func(*spl)
             except TypeError:
+                import sys
+                sys.excepthook(*sys.exc_info())
                 if spl:
                     raise InputError('unwanted extra text after "%s"' %
                                      ('%' + word1), char=spl[0])
@@ -112,7 +115,7 @@ def parts(block):
     implicit preceding '' delimiter.
 
         >>> p = parts([':\n', 'a 1\n', 'b 2\n', 'a 3\n', ';\n', 'g 10\n', 'h 11\n'])
-        >>> sorted(p.iterkeys())
+        >>> sorted(p.keys())
         [':', ';']
         >>> p[':']
         [Part(data=[('a', '1'), ('a', '3'), ('b', '2')], delim=':')]
@@ -154,7 +157,7 @@ class dataset(object):
         False
         >>> d.get('a')
         Traceback (most recent call last):
-        InputError: duplicate 'a'
+        sixx.input.InputError: duplicate 'a'
         >>> d.mget('a')
         [('1', None), ('3', None)]
         >>> d.get('b')
@@ -163,10 +166,10 @@ class dataset(object):
         [('2', None)]
         >>> d.get('d')
         Traceback (most recent call last):
-        InputError: 10: missing 'd'
+        sixx.input.InputError: 10: missing 'd'
         >>> d.getvalue('a')
         Traceback (most recent call last):
-        InputError: duplicate 'a'
+        sixx.input.InputError: duplicate 'a'
         >>> d.mgetvalue('a')
         ['1', '3']
         >>> d.getvalue('b')
@@ -181,20 +184,20 @@ class dataset(object):
         self._loc = loc
         if data is not None:
             try:
-                items = data.iteritems()
+                items = iter(data.items())
             except AttributeError:
                 items = iter(data)
             for key, value in items:
-                if not isinstance(key, basestring):
+                if not isinstance(key, str):
                     raise TypeError('dataset key must be a string')
                 if isinstance(value, tuple) and len(value) == 2:
-                    if not isinstance(value[0], basestring):
+                    if not isinstance(value[0], str):
                         raise TypeError('dataset value must be a string')
                     if not isinstance(value[1], dataset):
                         raise TypeError('dataset sub must be a dataset')
                     self.__data[key] = struct(value=value[0], sub=value[1])
                 else:
-                    if not isinstance(value, basestring):
+                    if not isinstance(value, str):
                         raise TypeError('dataset value must be a string')
                     self.__data[key] = struct(value=value, sub=None)
 
@@ -206,16 +209,13 @@ class dataset(object):
 
     def __repr__(self):
         args, kwargs = self._repr_initargs()
-        return '%s(%s)' % (self.__class__.__name__,
-                ', '.join(map(repr, args) +
-                          ['%s=%r' % i for i in sorted(kwargs.iteritems())]))
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(list(map(repr, args)) + ['%s=%r' % i for i in sorted(kwargs.items())]))
 
     def _repr_initargs(self):
         a = []
         kw = {}
         # Doesn't really need to be sorted except to help doctests.
-        for key, value in sorted(self.__data.iteritems(),
-                                 key=lambda i: (i[0], i[1].value)):
+        for key, value in sorted(iter(self.__data.items()), key=lambda i: (i[0], i[1].value)):
             if value.sub is not None:
                 a.append((key, (value.value, value.sub)))
             else:
@@ -234,6 +234,9 @@ class dataset(object):
             return NotImplemented
         return self.__data != other.__data
 
+    def __hash__(self):
+        return hash(self.__data)
+
     @classmethod
     def parse(class_, lines):
         r'''Parse a list of lines into a dataset, consuming the successfully
@@ -247,7 +250,7 @@ class dataset(object):
             ['+\n']
             >>> len(d)
             5
-            >>> sorted(d.iterkeys())
+            >>> sorted(d.keys())
             ['a', 'b', 'c']
             >>> d['a']
             [('1', None), ('2', None), ('3', None)]
@@ -311,24 +314,24 @@ class dataset(object):
         '''
         return key in self.__data
 
-    def iterkeys(self):
+    def keys(self):
         r'''Return an iterable over all the keys in the dataset (excluding keys
         in sub-datasets).
         '''
-        return self.__data.iterkeys()
+        return self.__data.keys()
 
-    def itervalues(self):
+    def values(self):
         r'''Return an iterable over of all the values (value, sub) in the
         dataset (excluding keys in sub-datasets).
         '''
-        for value in self.__data.itervalues():
+        for value in self.__data.values():
             yield (value.value, value.sub)
 
     def iteritems(self):
         r'''Return an iterable over of all the key-value pairs in the dataset
         (excluding keys in sub-datasets).
         '''
-        for key, value in self.__data.iteritems():
+        for key, value in self.__data.items():
             yield (key, (value.value, value.sub))
 
     def __getitem__(self, key):
@@ -447,45 +450,45 @@ class dataset_loc_memo(object):
         >>> '1' in m
         False
         >>> m.memo
-        set([])
+        set()
         >>> m.get('a')
         Traceback (most recent call last):
-        InputError: 3: duplicate 'a'
+        sixx.input.InputError: 3: duplicate 'a'
         >>> m.mget('a')
-        [(itext(u'1', loc=1), None), (itext(u'3', loc=3), None)]
+        [(itext('1', loc=1), None), (itext('3', loc=3), None)]
         >>> m.memo == set([1, 3])
         True
         >>> m.get('b')
-        (itext(u'2', loc=2), None)
+        (itext('2', loc=2), None)
         >>> m.memo == set([1, 2, 3])
         True
         >>> m.mget('b')
-        [(itext(u'2', loc=2), None)]
+        [(itext('2', loc=2), None)]
         >>> m.memo == set([1, 2, 3])
         True
         >>> m.get('d')
         Traceback (most recent call last):
-        InputError: 10: missing 'd'
+        sixx.input.InputError: 10: missing 'd'
         >>> m.getvalue('a')
         Traceback (most recent call last):
-        InputError: 3: duplicate 'a'
+        sixx.input.InputError: 3: duplicate 'a'
         >>> m.mgetvalue('a')
-        [itext(u'1', loc=1), itext(u'3', loc=3)]
+        [itext('1', loc=1), itext('3', loc=3)]
         >>> m.getvalue('b')
-        itext(u'2', loc=2)
+        itext('2', loc=2)
         >>> m.mgetvalue('b')
-        [itext(u'2', loc=2)]
+        [itext('2', loc=2)]
         >>> m.memo == set([1, 2, 3])
         True
         >>> m.getvalue('c')
         Traceback (most recent call last):
-        InputError: spurious data
+        sixx.input.InputError: spurious data
         >>> m.get('c')[0]
-        itext(u'4', loc=4)
+        itext('4', loc=4)
         >>> m.memo == set([1, 2, 3, 4])
         True
         >>> m.get('c')[1].getvalue('x')
-        itext(u'8', loc=8)
+        itext('8', loc=8)
         >>> m.memo == set([1, 2, 3, 4, 8])
         True
         >>> set(m.all_locs()) == set([1, 2, 3, 4, 8, 9])
@@ -595,7 +598,7 @@ def _iterlocs(ds):
     r'''Used by dataset_loc_memo.all_locs() to recursively iterate over all the
     loc()s of a given dataset.
     '''
-    for value, sub in ds.itervalues():
+    for value, sub in ds.values():
         loc = loc_of(value)
         if loc is not None:
             yield loc
@@ -644,7 +647,7 @@ class Part(dataset):
             ['-\n']
             >>> len(p)
             3
-            >>> list(p.iterkeys())
+            >>> list(p.keys())
             ['a']
             >>> p['a']
             [('1', None), ('2', None), ('3', None)]
@@ -654,7 +657,7 @@ class Part(dataset):
         assert len(lines) != 0
         line = lines[0]
         loc = None
-        if hasattr(line, 'loc') and callable(line.loc):
+        if hasattr(line, 'loc') and isinstance(line.loc, collections.Callable):
             loc = line.loc()
         delim = None
         if (len(line) == 2 and
@@ -664,7 +667,7 @@ class Part(dataset):
             lines.pop(0)
         part = class_(delim=delim, loc=loc)
         dataset._parse(part, lines)
-        for key in part.iterkeys():
+        for key in part.keys():
             try:
                 codecs.ascii_encode(key)
             except UnicodeError:

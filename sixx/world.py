@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Country and area.
 '''
@@ -7,6 +7,7 @@ import re
 from sixx.multilang import multilang
 from sixx.input import InputError
 from sixx.node import *
+import collections
 
 __all__ = ['World', 'Country', 'Area', 'Place', 'Has_country', 'Has_area']
 
@@ -44,9 +45,9 @@ class World(object):
 
     def add(self, country):
         if country.iso3166_a2 in self._countries:
-            raise ValueError, 'duplicate country %s' % country.iso3166_a2
+            raise ValueError('duplicate country %s' % country.iso3166_a2)
         if country.ccode in self._ccodes:
-            raise ValueError, 'duplicate country code %s' % country.ccode
+            raise ValueError('duplicate country code %s' % country.ccode)
         self._countries[country.iso3166_a2] = country
         self._ccodes[country.ccode] = country
 
@@ -63,7 +64,7 @@ class World(object):
         except KeyError:
             pass
         matched = []
-        for country in self._countries.itervalues():
+        for country in self._countries.values():
             if country.matches(name):
                 matched.append(country)
         if len(matched) == 0:
@@ -90,7 +91,7 @@ class World(object):
         except KeyError:
             pass
         matched = []
-        for country in self._countries.itervalues():
+        for country in self._countries.values():
             for area in country.iterareas():
                 if area.matches(name):
                     matched.append(area)
@@ -123,7 +124,7 @@ class World(object):
         country = Country.parse(text)
         try:
             self.add(country)
-        except ValueError, e:
+        except ValueError as e:
             raise InputError(e, line=text)
         return country
 
@@ -141,7 +142,7 @@ class World(object):
         assert len(text) != 0
         try:
             return self.lookup_place(text)
-        except LookupError, e:
+        except LookupError as e:
             raise InputError(e, char=text)
 
 class _Matcher(object):
@@ -166,7 +167,7 @@ class _Matcher(object):
     def matches(self, name):
         name = name.upper()
         for n in self.all_names_upper():
-            if hasattr(n, 'matches') and callable(n.matches):
+            if hasattr(n, 'matches') and isinstance(n.matches, collections.Callable):
                 if n.matches(name):
                     return True
             else:
@@ -183,8 +184,8 @@ class Country(Node, _Matcher):
         Country('AU', 'en_AU', '61', multilang(en='Australia'), aprefix='0', sprefix='1')
         >>> c
         Country('AU', 'en_AU', '61', multilang(en='Australia'), aprefix='0', sprefix='1')
-        >>> unicode(c)
-        u'Australia'
+        >>> str(c)
+        'Australia'
         >>> c.matches('AU')
         True
         >>> c.matches('au')
@@ -238,9 +239,6 @@ class Country(Node, _Matcher):
             for area in areas:
                 self.add(area)
 
-    def __unicode__(self):
-        return unicode(self.name)
-
     def __str__(self):
         return str(self.name)
 
@@ -262,8 +260,8 @@ class Country(Node, _Matcher):
         #    r += ['areas=%r' % areas]
         return '%s(%s)' % (self.__class__.__name__, ', '.join(r))
 
-    def __cmp__(self, other):
-        return cmp(self.iso3166_a2, other.iso3166_a2)
+    def __lt__(self, other):
+        return self.iso3166_a2 < other.iso3166_a2
 
     def all_names(self):
         r'''Iterate over all the names (basestring or multilang) that this
@@ -300,7 +298,7 @@ class Country(Node, _Matcher):
         return area in self._areas
 
     def iterareas(self):
-        return self._areas.itervalues()
+        return iter(self._areas.values())
 
     def lookup_area(self, name, *args):
         if len(args) > 1:
@@ -327,8 +325,8 @@ class Country(Node, _Matcher):
     def parse(class_, text):
         r'''Parse a country definition text.
 
-            >>> Country.parse(u'AU lang=en cc=61 ap=0 sp=1 "Australia"')
-            Country('AU', 'en_AU', '61', multilang(u'Australia'), aprefix='0', sprefix='1')
+            >>> Country.parse('AU lang=en cc=61 ap=0 sp=1 "Australia"')
+            Country('AU', 'en_AU', '61', multilang('Australia'), aprefix='0', sprefix='1')
 
         '''
         otext = text
@@ -433,9 +431,6 @@ class Area(Node, _Matcher):
         super(Area, self).__init__()
         self.country.add(self)
 
-    def __unicode__(self):
-        return unicode(self.name)
-
     def __str__(self):
         return str(self.name)
 
@@ -489,7 +484,7 @@ class Area(Node, _Matcher):
             raise InputError('missing name', line=otext)
         try:
             return class_(country, acode, name, fullname)
-        except ValueError, e:
+        except ValueError as e:
             raise InputError(e, line=otext)
 
 class Has_country(Link):
@@ -516,8 +511,8 @@ class Place(object):
         >>> p = Place(au)
         >>> p
         Place(Country('AU', 'en_AU', '61', multilang(en='Australia')))
-        >>> unicode(p)
-        u'Australia'
+        >>> str(p)
+        'Australia'
         >>> p.country is au
         True
         >>> p.area is None
@@ -526,8 +521,8 @@ class Place(object):
         >>> p = Place(sa)
         >>> p
         Place(Area(Country('AU', 'en_AU', '61', multilang(en='Australia')), '8', multilang('SA')))
-        >>> unicode(p)
-        u'SA, Australia'
+        >>> str(p)
+        'SA, Australia'
         >>> p.country is au
         True
         >>> p.area is sa
@@ -545,13 +540,10 @@ class Place(object):
         else:
             raise TypeError('Place() expects Country or Area argument')
 
-    def __unicode__(self):
-        if self.area:
-            return u', '.join([unicode(self.area), unicode(self.country)])
-        return unicode(self.country)
-
     def __str__(self):
-        return str(unicode(self))
+        if self.area:
+            return ', '.join([str(self.area), str(self.country)])
+        return str(self.country)
 
     def __repr__(self):
         if self.area is not None:

@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Email address report.
 '''
@@ -30,7 +30,7 @@ def report_email(options, model, predicate, local):
     itemiser = Itemiser()
     itemiser.update(model.nodes(is_other(instance_p(NamedNode) & predicate)))
     # Remove entries for families for which one or more of the heads was found.
-    for person in filter(lambda node: isinstance(node, Person), itemiser):
+    for person in [node for node in itemiser if isinstance(node, Person)]:
         for belongs_to in person.links(outgoing & is_link(Belongs_to)):
             if belongs_to.is_head:
                 itemiser.discard(belongs_to.family)
@@ -73,9 +73,9 @@ def print_emails(node, encoding):
     if isinstance(namenode, Person):
         name = namenode.email_address_name()
     else:
-        name = unicode(namenode)
+        name = str(namenode)
     printed = 0
     for addr in node.nodes(outgoing & is_link(Has_email)):
-        print addr.format(name, encoding)
+        print(addr.format(name, encoding))
         printed += 1
     return printed

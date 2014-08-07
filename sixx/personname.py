@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Personal names.
 '''
@@ -6,6 +6,7 @@ r'''Personal names.
 import operator
 from sixx.input import InputError
 from sixx.text import sortstr
+from functools import reduce
 
 __all__ = ['EnglishSpanishName', 'SingleName', 'DecoratedName']
 
@@ -164,7 +165,7 @@ class PersonName(object):
         very common contraction, for example "Tom" instead of "Thomas" or
         "John" instead of "Jonathon".  In Spanish speaking countries, the
         second apellido is usually omitted and common contractions are use in
-        given names, such as "Maite" for "María Teresa" and "Mª" for "María".
+        given names, such as "Maite" for "MarÃ­a Teresa" and "MÂª" for "MarÃ­a".
         The casual name is used as a sort key when sorting people by first name
         in an address book for personal use.
         @raise ValueError: if the casual name cannot be formed
@@ -241,24 +242,17 @@ class PersonName(object):
         '''
         parts = list(self._elements())
         while text and parts:
-            part = unicode(parts.pop(0))
+            part = str(parts.pop(0))
             if (text.startswith(part) and
                 (len(text) == len(part) or text[len(part)].isspace())):
                 text = text[len(part):].lstrip()
         return not text
 
-    def __str__(self):
-        r'''The str representation of a name is simply the unicode
-        representation encoded in the current encoding, so it could fail with a
-        UnicodeEncodingError.
-        '''
-        return str(unicode(self))
-
     def __hash__(self):
         r'''The hash depends on all the elements of the name.
         '''
         if self.__hash is None:
-            self.__hash = reduce(operator.xor, map(hash, self._elements()))
+            self.__hash = reduce(operator.xor, list(map(hash, self._elements())))
         return self.__hash
 
     def __eq__(self, other):
@@ -281,7 +275,7 @@ class PersonName(object):
         '''
         return '%s(%s)' % (self.__class__.__name__,
                 ', '.join(('%s=%r' % (k, v)
-                           for k, v in self._initargs().iteritems() if v)))
+                           for k, v in self._initargs().items() if v)))
 
 class EnglishSpanishName(PersonName):
 
@@ -357,8 +351,6 @@ class EnglishSpanishName(PersonName):
         ValueError: no formal salutation name for Zacharias [Zack] Quaid [Q.] Smith
         >>> n.collation_name()
         'Smith, Zacharias Quaid'
-        >>> unicode(n)
-        u'Zacharias [Zack] Quaid [Q.] Smith'
         >>> str(n)
         'Zacharias [Zack] Quaid [Q.] Smith'
 
@@ -420,8 +412,6 @@ class EnglishSpanishName(PersonName):
         ValueError: no formal salutation name for Z. Q. Smith
         >>> n.collation_name()
         'Smith, Z. Q.'
-        >>> unicode(n)
-        u'Z. Q. Smith'
         >>> str(n)
         'Z. Q. Smith'
 
@@ -460,8 +450,6 @@ class EnglishSpanishName(PersonName):
         >>> n.collation_name()
         Traceback (most recent call last):
         ValueError: no collation name for Zacharias [Zack]
-        >>> unicode(n)
-        u'Zacharias [Zack]'
         >>> str(n)
         'Zacharias [Zack]'
 
@@ -481,7 +469,7 @@ class EnglishSpanishName(PersonName):
             and Australia this is sometimes called the "nickname".  In Spain it
             is called the "apodo", and contractions are very common, such as
             Paco or Fran for Francisco, and Mayte for Maria Teresa -- the name
-            María is very common for women, so is nearly always omitted or
+            MarÃ­a is very common for women, so is nearly always omitted or
             contracted in casual use.
         @param giveni: The initials of the person's given name.
         @param middle: The person's middle name (or names).  These are given
@@ -510,13 +498,13 @@ class EnglishSpanishName(PersonName):
         middlei = middlei and middlei.strip()
         family = family and family.strip()
         family2 = family2 and family2.strip()
-        assert given is None or isinstance(given, basestring) and given
-        assert short is None or isinstance(short, basestring) and short
-        assert giveni is None or isinstance(giveni, basestring) and giveni
-        assert middle is None or isinstance(middle, basestring) and middle
-        assert middlei is None or isinstance(middlei, basestring) and middlei
-        assert family is None or isinstance(family, basestring) and family
-        assert family2 is None or isinstance(family2, basestring) and family2
+        assert given is None or isinstance(given, str) and given
+        assert short is None or isinstance(short, str) and short
+        assert giveni is None or isinstance(giveni, str) and giveni
+        assert middle is None or isinstance(middle, str) and middle
+        assert middlei is None or isinstance(middlei, str) and middlei
+        assert family is None or isinstance(family, str) and family
+        assert family2 is None or isinstance(family2, str) and family2
         if not (short or given or family):
             raise ValueError('%s() missing name' % self.__class__.__name__)
         if family2 and not family:
@@ -561,7 +549,7 @@ class EnglishSpanishName(PersonName):
                 'family': self.family,
                 'family2': self.family2}
 
-    def __unicode__(self):
+    def __str__(self):
         r'''The default string representation of a name contains almost all
         known elements, but it is not necessarily how one would normally write
         the name, because it may mix casual and formal parts not normally used
@@ -588,7 +576,7 @@ class EnglishSpanishName(PersonName):
             r.append(self.family)
         if self.family2:
             r.append(self.family2)
-        return u' '.join(r)
+        return ' '.join(r)
 
     @name_method
     def complete_name(self):
@@ -694,7 +682,7 @@ class SingleName(PersonName):
             nor family name may be, and vice versa.
         '''
         single = single and single.strip()
-        assert isinstance(single, basestring) and single
+        assert isinstance(single, str) and single
         self.single = single
 
     def _elements(self):
@@ -706,7 +694,7 @@ class SingleName(PersonName):
     def _initargs(self):
         return {'single': self.single}
 
-    def __unicode__(self):
+    def __str__(self):
         r'''The default string representation of a name contains all known
         elements, so it is not necessarily how one would normally write the
         name.
@@ -795,8 +783,8 @@ class NameWrapper(PersonName):
     def _initargs(self):
         return {'wrapped': self._wrapped}
 
-    def __unicode__(self):
-        return unicode(self._wrapped)
+    def __str__(self):
+        return str(self._wrapped)
 
     @defer_to_wrapped
     def complete_name(self):
@@ -860,18 +848,18 @@ class DecoratedName(NameWrapper):
         ...                        family="Smith")
         >>> d = DecoratedName(n, letters="B.Med.", title="Dr", \
         ...         honorific="The Good Doctor", salutation="Zacko")
-        >>> unicode(d)
-        u'[The Good Doctor] Dr Zacharias [Zack] Quaid [Q.] Smith, B.Med. [Zacko]'
+        >>> str(d)
+        '[The Good Doctor] Dr Zacharias [Zack] Quaid [Q.] Smith, B.Med. [Zacko]'
         >>> d.complete_name()
-        sortstr.new(u'The Good Doctor Zacharias Quaid Smith, B.Med.', slice(16, 37, None))
+        sortstr.new('The Good Doctor Zacharias Quaid Smith, B.Med.', slice(16, 37, None))
         >>> d.formal_index_name()
-        sortstr.new(u'Dr Zacharias Smith', slice(3, 18, None))
+        sortstr.new('Dr Zacharias Smith', slice(3, 18, None))
         >>> d.informal_index_name()
         'Zack Smith'
         >>> d.formal_name()
-        sortstr.new(u'The Good Doctor Zacharias Smith, B.Med.', slice(16, 31, None))
+        sortstr.new('The Good Doctor Zacharias Smith, B.Med.', slice(16, 31, None))
         >>> d.social_name()
-        sortstr.new(u'Dr Smith', slice(3, 8, None))
+        sortstr.new('Dr Smith', slice(3, 8, None))
         >>> d.full_name()
         'Zacharias Smith'
         >>> d.casual_name()
@@ -881,7 +869,7 @@ class DecoratedName(NameWrapper):
         >>> d.formal_salutation_name()
         'Zacko'
         >>> d.collation_name()
-        sortstr.new(u'Dr Smith, Zacharias Quaid', slice(3, 25, None))
+        sortstr.new('Dr Smith, Zacharias Quaid', slice(3, 25, None))
 
         >>> eval(repr(d)) == d
         True
@@ -899,19 +887,19 @@ class DecoratedName(NameWrapper):
 
         >>> n = EnglishSpanishName(giveni="Z.", middlei="Q.", family="Smith")
         >>> d = DecoratedName(n, title="Dr")
-        >>> unicode(d)
-        u'Dr Z. Q. Smith'
+        >>> str(d)
+        'Dr Z. Q. Smith'
         >>> d.complete_name()
-        sortstr.new(u'Dr Z. Q. Smith', slice(3, 14, None))
+        sortstr.new('Dr Z. Q. Smith', slice(3, 14, None))
         >>> d.formal_index_name()
-        sortstr.new(u'Dr Z. Smith', slice(3, 11, None))
+        sortstr.new('Dr Z. Smith', slice(3, 11, None))
         >>> d.informal_index_name()
         Traceback (most recent call last):
         ValueError: no informal index name for Z. Q. Smith
         >>> d.formal_name()
-        sortstr.new(u'Dr Z. Smith', slice(3, 11, None))
+        sortstr.new('Dr Z. Smith', slice(3, 11, None))
         >>> d.social_name()
-        sortstr.new(u'Dr Smith', slice(3, 8, None))
+        sortstr.new('Dr Smith', slice(3, 8, None))
         >>> d.full_name()
         'Z. Smith'
         >>> d.casual_name()
@@ -921,9 +909,9 @@ class DecoratedName(NameWrapper):
         Traceback (most recent call last):
         ValueError: no familiar name for Dr Z. Q. Smith
         >>> d.formal_salutation_name()
-        sortstr.new(u'Dr Smith', slice(3, 8, None))
+        sortstr.new('Dr Smith', slice(3, 8, None))
         >>> d.collation_name()
-        sortstr.new(u'Dr Smith, Z. Q.', slice(3, 15, None))
+        sortstr.new('Dr Smith, Z. Q.', slice(3, 15, None))
 
         >>> eval(repr(d)) == d
         True
@@ -958,12 +946,12 @@ class DecoratedName(NameWrapper):
         salutation = salutation and salutation.strip()
         honorific = honorific and honorific.strip()
         letters = letters and letters.strip()
-        assert title is None or isinstance(title, basestring) and title
-        assert salutation is None or isinstance(salutation, basestring) and \
+        assert title is None or isinstance(title, str) and title
+        assert salutation is None or isinstance(salutation, str) and \
                 salutation
-        assert honorific is None or isinstance(honorific, basestring) and \
+        assert honorific is None or isinstance(honorific, str) and \
                 honorific
-        assert letters is None or isinstance(letters, basestring) and letters
+        assert letters is None or isinstance(letters, str) and letters
         if honorific and not title:
             raise ValueError('%s() honorific without title' %
                              self.__class__.__name__)
@@ -992,28 +980,28 @@ class DecoratedName(NameWrapper):
         r.update(NameWrapper._initargs(self))
         return r
 
-    def __unicode__(self):
+    def __str__(self):
         r'''The default string representation of a decorated name contains all
         elements, so it is not necessarily how one would normally write the
         name.
         '''
         r = []
         if self.honorific:
-            r.append(u'[')
+            r.append('[')
             r.append(self.honorific)
-            r.append(u'] ')
+            r.append('] ')
         if self.title:
             r.append(self.title)
-            r.append(u' ')
-        r.append(unicode(self._wrapped))
+            r.append(' ')
+        r.append(str(self._wrapped))
         if self.letters:
-            r.append(u', ')
+            r.append(', ')
             r.append(self.letters)
         if self.salutation:
-            r.append(u' [')
+            r.append(' [')
             r.append(self.salutation)
-            r.append(u']')
-        return u''.join(r)
+            r.append(']')
+        return ''.join(r)
 
     @defer_to_wrapped
     def social_name(self):

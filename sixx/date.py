@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Dates and times.
 '''
@@ -131,7 +131,7 @@ class Datetime(object):
 
             >>> Datetime.parse('tue 9/10/2006 09:48:00 +0930')
             Traceback (most recent call last):
-            InputError: incorrect day of week Tuesday (should be Monday)
+            sixx.input.InputError: incorrect day of week Tuesday (should be Monday)
 
         You can omit the year, which makes it useful for birthdays when the
         age is unknown:
@@ -160,7 +160,7 @@ class Datetime(object):
 
             >>> Datetime.parse('mon feb 29 9:48am 2006 +09:30')
             Traceback (most recent call last):
-            InputError: day is out of range for month
+            sixx.input.InputError: day is out of range for month
 
         You can omit the time:
 
@@ -250,7 +250,7 @@ class Datetime(object):
                     text = text[:m.start()] + text[m.end():]
         # If there is any alphnumeric left over, then we failed to parse
         # something.
-        for i in xrange(len(text)):
+        for i in range(len(text)):
             if text[i].isalnum():
                 raise InputError('malformed date/time at "%s"' %
                                  text[i:].split(None, 1)[0], char=text[i])
@@ -262,7 +262,7 @@ class Datetime(object):
                     if v is not None))
         try:
             return class_(**kw)
-        except ValueError, e:
+        except ValueError as e:
             raise InputError(e, char=orig_text)
 
     _re_tzoffset = re.compile(r'([+\-])(0\d|1[012]):?(\d\d)\b')
@@ -298,13 +298,13 @@ class Datetime(object):
         class_._weekdays = []
         oloc = locale.getlocale(locale.LC_TIME)
         locale.setlocale(locale.LC_TIME, 'C')
-        for d in xrange(7):
+        for d in range(7):
             n = (d + 1) % 7 + 1 # 0 = Monday = locale.DAY_2
             class_._weekdays.append(
                 (locale.nl_langinfo(getattr(locale, 'DAY_%d' % n)).lower(), d))
             class_._weekdays.append(
                 (locale.nl_langinfo(getattr(locale, 'ABDAY_%d' % n)).lower(), d))
-        for m in xrange(1, 13):
+        for m in range(1, 13):
             class_._months.append(
                 (locale.nl_langinfo(getattr(locale, 'MON_%d' % m)).lower(), m))
             class_._months.append(

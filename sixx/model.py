@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model.
 '''
@@ -63,8 +63,8 @@ class Model(Node):
     def _registered(self):
         r'''Iterate over all the registered nodes.
         '''
-        for reg in self.registered.itervalues():
-            for node in reg.itervalues():
+        for reg in self.registered.values():
+            for node in reg.values():
                 yield node
 
     def keyword(self, key):
@@ -79,7 +79,7 @@ class Model(Node):
         @raise LookupError: no node matches
         '''
         found = None
-        for rtyp, objs in self.registered.iteritems():
+        for rtyp, objs in self.registered.items():
             if issubclass(rtyp, typ):
                 for obj in objs:
                     if obj.matches(text):
@@ -202,10 +202,10 @@ class ModelParser(object):
             self._suspend('find(%r, %r)' % (typ, text))
             try:
                 return self.model.find(typ, text)
-            except FindError, e:
+            except FindError as e:
                 # Found more than one node - bail out.
                 raise
-            except LookupError, e:
+            except LookupError as e:
                 # Found no node.  If we are bailing out, then re-raise the
                 # exception, otherwise suspend and try again.
                 if self._no_suspend:
@@ -290,12 +290,12 @@ class ModelParser(object):
         '''
         # Split the block into its parts.
         parts = parse.parts(block)
-        for key in parts.iterkeys():
+        for key in parts.keys():
             if key not in ('', '+', '-', '='):
                 raise InputError('illegal delimiter', line=key)
         # Identify the "common" part and "member" parts.
         if len(parts) == 1:
-            common = parts.itervalues().next()[0]
+            common = next(iter(parts.values()))[0]
             members = []
         else:
             assert len(parts) > 1
@@ -398,7 +398,7 @@ class ModelParser(object):
             if org:
                 self.parse_residences(common, org)
             else:
-                aka = map(multilang.optparse, common.mgetvalue('aka', []))
+                aka = list(map(multilang.optparse, common.mgetvalue('aka', [])))
                 fam = Family(aka=aka)
                 self.parse_residences(common, fam)
             for member in members:
@@ -480,7 +480,7 @@ class ModelParser(object):
         company = None
         if 'co' in part:
             name = multilang.optparse(part.getvalue('co'))
-            aka = map(multilang.optparse, part.mgetvalue('aka', []))
+            aka = list(map(multilang.optparse, part.mgetvalue('aka', [])))
             # The preferred name is the one that appears first in the input.
             prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
             company = self.model.register(Company(name=name, aka=aka,
@@ -506,7 +506,7 @@ class ModelParser(object):
             is_head = False
         aka = []
         if with_aka:
-            aka = map(multilang.optparse, part.mgetvalue('aka', []))
+            aka = list(map(multilang.optparse, part.mgetvalue('aka', [])))
         prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
         dept = self.model.register(Department(name=name, aka=aka,
                                               prefer=prefer))
@@ -515,7 +515,7 @@ class ModelParser(object):
             company = self.find(Company, part.getvalue('of'))
         try:
             Has_department(company, dept, is_head=is_head)
-        except ValueError, e:
+        except ValueError as e:
             raise InputError(e, line=name)
         return dept
 
@@ -605,7 +605,7 @@ class ModelParser(object):
             raise InputError('missing person', line=part)
         aka = None
         if with_aka:
-            aka = map(multilang.optparse, part.mgetvalue('aka', []))
+            aka = list(map(multilang.optparse, part.mgetvalue('aka', [])))
         per = self.model.register(Person.from_initargs(pn, aka=aka),
                                   principal=principal)
         # Birthday.
@@ -713,7 +713,7 @@ class ModelParser(object):
             for name, sub in part.mget(key):
                 try:
                     oth = self.find(ntype, name)
-                except LookupError, e:
+                except LookupError as e:
                     raise InputError(e, char=name)
                 if sub:
                     sub.updated = self.parse_update(sub) or part.updated
@@ -842,7 +842,7 @@ class ModelParser(object):
         for value, sub in part.mget('home', []):
             try:
                 res = self.find(Residence, value)
-            except LookupError, e:
+            except LookupError as e:
                 raise InputError(e, char=value)
             if sub:
                 sub.place = res.only_place()
@@ -861,7 +861,7 @@ class ModelParser(object):
         for value, sub in part.mget('loc', []):
             try:
                 host = self.find(Organisation, value)
-            except LookupError, e:
+            except LookupError as e:
                 raise InputError(e, char=value)
             if sub:
                 sub.place = host.only_place()
@@ -922,7 +922,7 @@ class ModelParser(object):
             return None
         try:
             return Datetime.parse(part.getvalue('upd')).as_date()
-        except ValueError, e:
+        except ValueError as e:
             raise InputError(e, char=part.getvalue('upd'))
 
     def parse_data(self, part, who):

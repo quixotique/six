@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Dump report.
 '''
@@ -36,7 +36,7 @@ def report_dump_getopt(parser):
                       help='use ENCODE as output encoding')
     parser.add_option('-s', '--sort-mode', metavar='MODE',
                       action='store', type='choice', dest='sort_mode',
-                      choices=sort_modes.keys(),
+                      choices=list(sort_modes.keys()),
                       help='use MODE as sort mode')
 
 def report_dump(options, model, predicate, local):
@@ -54,8 +54,8 @@ def report_dump(options, model, predicate, local):
     see_in = defaultdict(set)
     alias = dict()
     # Form the sorted index of all the top-level entries in the report.
-    toplevel = sorted(chain(itemiser.items(),
-                            itemiser.alias_items(alias.iteritems())))
+    toplevel = sorted(chain(list(itemiser.items()),
+                            itemiser.alias_items(iter(alias.items()))))
     # Remove unnecessary references.
     cull_references(toplevel)
     # Now format the report.
@@ -89,10 +89,10 @@ def report_dump(options, model, predicate, local):
             dump_organisation(item.node, tree.sub(),
                               seen - see_in.get(item.node, set()))
     if options.output_path:
-        ofile = file(options.output_path, 'w')
+        ofile = file(options.output_path, 'wb', encoding=options.encoding, errors='replace')
     else:
         ofile = sys.stdout
-    ofile.write(unicode(tree).encode(options.encoding, 'replace'))
+    ofile.write(str(tree))
 
 def add_name(node, tree, context=None):
     if context is not None:
@@ -127,7 +127,7 @@ def add_name(node, tree, context=None):
 def dump_names(node, tree, context=None, name=None):
     if name:
         tree.add(name)
-        aka_names = map(unicode, node.names())
+        aka_names = list(map(str, node.names()))
     else:
         aka_names = add_name(node, tree, context)
     tree.nl()
@@ -157,7 +157,7 @@ def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
             refonly = link.family in seen
             if refonly:
                 tree.add('-> ')
-                tree.add(link.family.sort_keys(tree.sort_mode).next())
+                tree.add(next(link.family.sort_keys(tree.sort_mode)))
             else:
                 tree.add('-- ')
                 add_name(link.family, tree, link)
@@ -179,7 +179,7 @@ def dump_person(per, tree, seen=frozenset(), show_family=True, show_work=True,
             if link.position:
                 tree.add(link.position, ', ')
             if refonly:
-                tree.add(link.org.sort_keys(tree.sort_mode).next())
+                tree.add(next(link.org.sort_keys(tree.sort_mode)))
             else:
                 add_name(link.org, tree, link)
             tree.nl()
@@ -211,7 +211,7 @@ def dump_family(fam, tree, seen=frozenset(), show_members=True, show_data=True):
                                           l.person.sortkey())):
             if link.person in seen:
                 tree.add('-> ')
-                tree.add(link.person.sort_keys(tree.sort_mode).next())
+                tree.add(next(link.person.sort_keys(tree.sort_mode)))
                 tree.nl()
                 sub = tree.sub()
                 dump_comments(link, sub)
@@ -245,7 +245,7 @@ def dump_organisation(org, tree, seen=frozenset(), show_workers=True,
         refonly = link.dept in seen
         if refonly:
             tree.add('-> ')
-            tree.add(link.dept.sort_keys(tree.sort_mode).next())
+            tree.add(next(link.dept.sort_keys(tree.sort_mode)))
             tree.nl()
         else:
             dump_names(link.dept, tree, link)
@@ -264,7 +264,7 @@ def dump_works_at(org, tree, seen):
         refonly = link.person in seen
         if refonly:
             tree.add('-> ')
-            tree.add(link.person.sort_keys(tree.sort_mode).next())
+            tree.add(next(link.person.sort_keys(tree.sort_mode)))
             if link.position:
                 tree.add(', ', link.position)
             tree.nl()
@@ -283,9 +283,9 @@ def dump_works_at(org, tree, seen):
 def dump_email(who, tree):
     for link in who.links(outgoing & is_link(Has_email)):
         if isinstance(link, At_work):
-            tree.add(unicode(qual_work).capitalize(), ': ')
+            tree.add(str(qual_work).capitalize(), ': ')
         elif isinstance(link, At_home):
-            tree.add(unicode(qual_home).capitalize(), ': ')
+            tree.add(str(qual_home).capitalize(), ': ')
         tree.set_wrapmargin()
         tree.add(link.email)
         wrap_comments(link.email, tree)
@@ -313,12 +313,12 @@ def telephones(who, tree, qual=None, comment=None, bold=False,
 
 def telephone(link, tree, qual=None, comment=None, bold=False):
     if isinstance(link, Has_mobile):
-        tree.add(multilang(en='Mob', es=u'Móv'))
+        tree.add(multilang(en='Mob', es='MÃ³v'))
     elif isinstance(link, Has_fax):
-        tree.add(u'Fax')
+        tree.add('Fax')
     else:
         assert isinstance(link, Has_fixed)
-        tree.add(multilang(en='Tel', es=u'Tlf'))
+        tree.add(multilang(en='Tel', es='Tlf'))
     if qual:
         tree.add(' ', qual)
     elif isinstance(link, At_work):
@@ -357,7 +357,7 @@ def dump_locations(org, tree, seen):
         refonly = link.host in seen
         if refonly:
             tree.add('c/-> ')
-            tree.add(link.host.sort_keys(tree.sort_mode).next())
+            tree.add(next(link.host.sort_keys(tree.sort_mode)))
             tree.nl()
         else:
             tree.add('c/-- ')
@@ -383,8 +383,8 @@ def dump_data(who, tree):
         if key not in others:
             others[key] = []
         others[key].append(link)
-    keys = others.keys()
-    keys.sort(key=lambda k: (not k[0], unicode(k[1]), unicode(k[2])))
+    keys = list(others.keys())
+    keys.sort(key=lambda k: (not k[0], str(k[1]), str(k[2])))
     for key in keys:
         (is_in, other, position, agent) = key
         links = others[key]
@@ -410,7 +410,7 @@ def dump_data(who, tree):
             sub = tree.sub()
             dump_comments(link, sub)
             data = list(link.nodes(incoming & is_link(Has_context)))
-            data.sort(key=unicode)
+            data.sort(key=str)
             for datum in data:
                 sub.add(datum)
                 sub.nl()
@@ -420,6 +420,6 @@ def dump_comments(node, tree):
     for com in node.nodes(outgoing & is_link(Has_comment)):
         tree.add('; ')
         tree.set_wrapmargin()
-        tree.wrap(unicode(com))
+        tree.wrap(str(com))
         tree.nl()
 

@@ -1,5 +1,5 @@
-#!/home/andrewb/lib/six/bin/python
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+#!/home/andrewb/lib/six3/bin/python
+# vim: sw=4 sts=4 et fileencoding=utf-8 nomod
 
 from distutils.core import setup
 

@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model - sorting.
 '''
@@ -87,7 +87,7 @@ class Itemiser(object):
                     item.single = items[0]
                 self._items[node1] = items
         if node is None:
-            for items in self._items.itervalues():
+            for items in self._items.values():
                 for item in items:
                     yield item
         else:
@@ -100,7 +100,7 @@ class Itemiser(object):
         itemiser already.
         '''
         for src, dst in aliases:
-            di = self.items(dst).next()
+            di = next(self.items(dst))
             for key in src.sort_keys(sort_mode=self.sort_mode):
                 si = SortItem(dst, key)
                 si.single = di
@@ -126,10 +126,15 @@ class SortItem(object):
         self.sortkey = text_sort_key(key)
         self.single = single if single is not None else self
 
-    def __cmp__(self, other):
+    def __eq__(self, other):
         if not isinstance(other, SortItem):
             return NotImplemented
-        return cmp(self.sortkey, other.sortkey)
+        return self.sortkey == other.sortkey
+
+    def __lt__(self, other):
+        if not isinstance(other, SortItem):
+            return NotImplemented
+        return self.sortkey < other.sortkey
 
     def __repr__(self):
         r = ['node=%r' % self.node, 'key=%r' % self.key]
@@ -146,7 +151,7 @@ def cull_references(itemlist, horizon=8):
     for i, item in enumerate(itemlist):
         if item is item.single:
             lim = 0
-            for j in xrange(i - 1, -1, -1):
+            for j in range(i - 1, -1, -1):
                 if itemlist[j].sortkey[:3] != item.sortkey[:3]:
                     break
                 if itemlist[j].node:
@@ -160,7 +165,7 @@ def cull_references(itemlist, horizon=8):
     for i, item in enumerate(itemlist):
         if item is not item.single:
             lim = 0
-            for j in xrange(i - 1, -1, -1):
+            for j in range(i - 1, -1, -1):
                 if itemlist[j].sortkey[:3] != item.sortkey[:3]:
                     break
                 if itemlist[j].node:

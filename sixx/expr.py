@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Predicate expression parsing.
 '''
@@ -14,11 +14,11 @@ from sixx.util import iempty
 
 __all__ = ['parse_predicate', 'ExprError']
 
-class ExprError(StandardError):
+class ExprError(Exception):
     pass
 
 def parse_predicate(model, tokens):
-    r'''Parse the sequence of unicode tokens as a predicate expression.
+    r'''Parse the sequence of string tokens as a predicate expression.
     '''
     parser = Predicate_Parser(model)
     return parser.parse(tokens)
@@ -44,7 +44,7 @@ class Predicate_Parser(object):
     def is_operator(self, token):
         # Horribly inefficient.
         for obj in chain([self], inspect.getmro(type(self))):
-            for name, value in obj.__dict__.iteritems():
+            for name, value in obj.__dict__.items():
                 if name.startswith('OP_') and token == value:
                     return True
         return False
@@ -85,7 +85,6 @@ class Predicate_Parser(object):
         if token.startswith('='):
             kwstr = token[1:]
             try:
-                kwstr = kwstr.encode('ascii')
                 kw = self.model.keyword(kwstr)
             except UnicodeEncodeError:
                 raise ExprError('invalid keyword %r' % kwstr)
@@ -95,7 +94,7 @@ class Predicate_Parser(object):
         elif token.startswith('in:'):
             try:
                 place = self.model.lookup_place(token[3:])
-            except LookupError, e:
+            except LookupError as e:
                 raise ExprError('no such place %r' % token[3:])
             return in_place(place)
         elif (token.startswith('work:') or token.startswith('loc:') or

@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model - Organisation and Works_at.
 '''
@@ -28,7 +28,7 @@ class Organisation(NamedNode):
         @param aka: other names
         @param prefer: preferred name
         '''
-        assert isinstance(name, (basestring, multilang))
+        assert isinstance(name, (str, multilang))
         if prefer is not None:
             assert prefer == name or prefer in aka
         super(Organisation, self).__init__(aka=aka)
@@ -47,7 +47,7 @@ class Organisation(NamedNode):
                 yield name
 
     def sortkey(self):
-        return self.names().next()
+        return next(self.names())
 
     def all_parents(self):
         r'''Iterate through all the organisations that this organisation
@@ -87,7 +87,7 @@ class Organisation(NamedNode):
                 yield tup[-1].place
 
     def __repr__(self):
-        r = ['name=%r' % self.name, 'aka=%r' % map(repr, self.aka)]
+        r = ['name=%r' % self.name, 'aka=%r' % list(map(repr, self.aka))]
         if self.prefer is not None:
             r.append('prefer=%r' % self.prefer)
         return '%s(%s)' % (self.__class__.__name__, ', '.join(r))
@@ -123,20 +123,24 @@ class Has_department(Link):
     def __init__(self, company, dept, is_head=False, timestamp=None):
         assert isinstance(company, Company)
         assert isinstance(dept, Department)
-        dups = list(dept.links(incoming & is_link(Has_department)))
-        if dups:
-            raise ValueError('%s is already a department of %s' %
-                             unicode(dups[0].dept), unicode(dups[0].company))
-        super(Has_department, self).__init__(company, dept, timestamp=timestamp)
         self.company = company
         self.dept = dept
         self.is_head = bool(is_head)
+        dups = list(dept.links(incoming & is_link(Has_department)))
+        if dups:
+            raise ValueError('%s is already a department of %s' % str(dups[0].dept), str(dups[0].company))
+        super(Has_department, self).__init__(company, dept, timestamp=timestamp)
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if not isinstance(other, Has_department):
             return NotImplemented
-        return (cmp(0 if self.is_head else 1, 0 if other.is_head else 1) or
-                cmp(self.dept.sortkey(), other.dept.sortkey()))
+        if self.is_head:
+            if not other.is_head:
+                return True
+        elif other.is_head:
+            if not other.is_head:
+                return False
+        return self.dept.sortkey() < other.dept.sortkey()
 
     def only_place(self):
         r'''The place of a company is the default place of its departments.
@@ -153,26 +157,29 @@ class Works_at(Association):
     and that the person may represent the organisation in some way.
     '''
 
-    def __init__(self, person, org, position=None, is_head=False, sequence=None,
-                       timestamp=None):
+    def __init__(self, person, org, position=None, is_head=False, sequence=None, timestamp=None):
         from sixx.person import Person
         from sixx.address import Residence
         assert isinstance(person, Person)
         assert isinstance(org, (Organisation, Residence))
         if position is not None:
-            assert isinstance(position, (basestring, multilang))
-        super(Works_at, self).__init__(person, org, position=position,
-                                       timestamp=timestamp)
+            assert isinstance(position, (str, multilang))
         self.person = person
         self.org = org
         self.is_head = bool(is_head)
         self.sequence = sequence
+        super(Works_at, self).__init__(person, org, position=position, timestamp=timestamp)
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if not isinstance(other, Works_at):
             return NotImplemented
-        return (cmp(self.sequence or 0, other.sequence or 0) or
-                cmp(self.person.sortkey(), other.person.sortkey()))
+        if not self.sequence:
+            if other.sequence:
+                return True
+        elif self.sequence:
+            if not other.sequence:
+                return False
+        return self.person.sortkey() < other.person.sortkey()
 
     def __repr__(self):
         r = ['person=%r' % self.person,
@@ -193,16 +200,21 @@ class Located_at(Association):
     def __init__(self, client, host, sequence=None, timestamp=None):
         assert isinstance(client, Organisation)
         assert isinstance(host, Organisation)
-        super(Located_at, self).__init__(client, host, timestamp=timestamp)
         self.client = client
         self.host = host
         self.sequence = sequence
+        super(Located_at, self).__init__(client, host, timestamp=timestamp)
 
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if not isinstance(other, Located_at):
             return NotImplemented
-        return (cmp(self.sequence or 0, other.sequence or 0) or
-                cmp(self.client.sortkey(), other.client.sortkey()))
+        if not self.sequence:
+            if other.sequence:
+                return True
+        elif self.sequence:
+            if not other.sequence:
+                return False
+        return self.client.sortkey() < other.client.sortkey()
 
     def __repr__(self):
         r = ['client=%r' % self.client,

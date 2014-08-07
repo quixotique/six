@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Formatted output.
 '''
@@ -52,7 +52,7 @@ class Treebuf(_Treebuf):
             func(r)
         return r.render()
 
-    def __unicode__(self):
+    def __str__(self):
         return self.as_text()
 
 class Tree_Text_Renderer(object):
@@ -74,9 +74,9 @@ class Tree_Text_Renderer(object):
             self._column = self._margin
             self._output.append(' ' * self._column)
         # Piece of text could be a multilang, which must be converted to
-        # unicode for output.
-        if not isinstance(piece, basestring):
-            piece = unicode(piece)
+        # str for output.
+        if not isinstance(piece, str):
+            piece = str(piece)
         self._column += len(piece)
         if decorator:
             piece = decorator(piece)
@@ -106,7 +106,7 @@ class Tree_Text_Renderer(object):
             self._add(line[self._margin:], decorator)
 
     def render(self):
-        return u''.join(self._output)
+        return ''.join(self._output)
 
     @classmethod
     def decorator(class_, bold=False, underline=False):

@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Comment - miscellaneous text that can be attached to just about any node.
 '''
@@ -15,15 +15,12 @@ class Comment(Node):
     '''
 
     def __init__(self, text):
-        assert isinstance(text, basestring)
+        assert isinstance(text, str)
         super(Comment, self).__init__()
         self.text = text
 
-    def __unicode__(self):
-        return unicode(self.text)
-
     def __str__(self):
-        return str(unicode(self))
+        return str(self.text)
 
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.text)
@@ -31,8 +28,8 @@ class Comment(Node):
     @classmethod
     def parse(class_, text, world=None, place=None, default_place=None):
         r'''
-            >>> Comment.parse(u'This is a comment')
-            (Comment(u'This is a comment'), None)
+            >>> Comment.parse('This is a comment')
+            (Comment('This is a comment'), None)
 
         '''
         return class_(text), None

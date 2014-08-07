@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model - keywords.
 '''
@@ -24,7 +24,7 @@ class Keyword(Node):
     '''
 
     def __init__(self, keyword):
-        assert isinstance(keyword, str)
+        assert isinstance(keyword, str), 'keyword=%r' % (keyword,)
         super(Keyword, self).__init__()
         self.keyword = keyword
 
@@ -33,9 +33,6 @@ class Keyword(Node):
 
     def __str__(self):
         return self.keyword
-
-    def __unicode__(self):
-        return unicode(self.keyword)
 
     def __hash__(self):
         return hash(self.keyword)
@@ -55,20 +52,20 @@ class Keyword(Node):
     @classmethod
     def parse(class_, text):
         r'''
-            >>> Keyword.parse(u'foo   bar')
-            (Keyword('foo'), u'bar')
+            >>> Keyword.parse('foo   bar')
+            (Keyword('foo'), 'bar')
 
             >>> Keyword.parse('-abc')
             Traceback (most recent call last):
-            InputError: malformed keyword '-abc'
+            sixx.input.InputError: malformed keyword '-abc'
 
             >>> Keyword.parse('abc!')
             Traceback (most recent call last):
-            InputError: malformed keyword 'abc!'
+            sixx.input.InputError: malformed keyword 'abc!'
 
-            >>> Keyword.parse(u'äbc')
+            >>> Keyword.parse('Ã¤bc')
             Traceback (most recent call last):
-            InputError: malformed keyword u'\xe4bc'
+            sixx.input.InputError: malformed keyword '\xe4bc'
 
         '''
         spl = text.split(None, 1)

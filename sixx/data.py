@@ -1,4 +1,4 @@
-# vim: sw=4 sts=4 et fileencoding=latin1 nomod
+# vim: sw=4 sts=4 et fileencoding=utf8 nomod
 
 r'''Data model - contextual data.
 '''
@@ -20,21 +20,21 @@ class Data(Node):
     linked, uniquely identifies the atom.'''
 
     def __init__(self, context, id, value, timestamp=None):
-        assert isinstance(id, basestring)
-        assert isinstance(value, basestring)
+        assert isinstance(id, str)
+        assert isinstance(value, str)
         super(Data, self).__init__()
         self.id = id
         self.value = value
         Has_context(self, context, timestamp=timestamp)
 
     def context(self):
-        return self.nodes(outgoing & is_link(Has_context)).next()
+        return next(self.nodes(outgoing & is_link(Has_context)))
 
     def key(self):
         return self.context(), self.id
 
-    def __unicode__(self):
-        return u' = '.join((self.id, self.value))
+    def __str__(self):
+        return ' = '.join((self.id, self.value))
 
 class Has_context(Link):
 
