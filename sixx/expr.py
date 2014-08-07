@@ -5,12 +5,12 @@ r'''Predicate expression parsing.
 
 from itertools import chain
 import inspect
-from six.node import (node_predicate, name_imatches, in_place, outgoing,
+from sixx.node import (node_predicate, name_imatches, in_place, outgoing,
                       is_link, to_node)
-from six.links import from_node, With, Ex
-from six.keyword import keyed_with
-from six.org import Organisation, Works_at, Located_at
-from six.util import iempty
+from sixx.links import from_node, With, Ex
+from sixx.keyword import keyed_with
+from sixx.org import Organisation, Works_at, Located_at
+from sixx.util import iempty
 
 __all__ = ['parse_predicate', 'ExprError']
 

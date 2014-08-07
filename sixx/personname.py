@@ -4,8 +4,8 @@ r'''Personal names.
 '''
 
 import operator
-from six.input import InputError
-from six.text import sortstr
+from sixx.input import InputError
+from sixx.text import sortstr
 
 __all__ = ['EnglishSpanishName', 'SingleName', 'DecoratedName']
 

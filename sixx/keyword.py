@@ -4,11 +4,11 @@ r'''Data model - keywords.
 '''
 
 import re
-from six.input import InputError
-from six.node import *
-from six.person import *
-from six.family import *
-from six.org import *
+from sixx.input import InputError
+from sixx.node import *
+from sixx.person import *
+from sixx.family import *
+from sixx.org import *
 
 __all__ = ['Keyword', 'Keyed_with', 'keyed_with']
 
@@ -88,7 +88,7 @@ class Keyed_with(Link):
         self.who = who
         self.keyword = keyword
 
-from six.node import node_predicate
+from sixx.node import node_predicate
 
 def keyed_with(keyword):
     r'''Return a predicate that returns true if the node at the other end of

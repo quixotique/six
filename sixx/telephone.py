@@ -4,10 +4,10 @@ r'''Data model - telephone numbers.
 '''
 
 import re
-from six.multilang import multilang
-from six.input import InputError
-from six.node import *
-from six.world import *
+from sixx.multilang import multilang
+from sixx.input import InputError
+from sixx.node import *
+from sixx.world import *
 
 __all__ = [
         'Telephone',
@@ -341,11 +341,11 @@ class Telephone(Node):
 class Has_phone(Link):
 
     def __init__(self, who, tel, comment=None, timestamp=None):
-        from six.person import Person
-        from six.family import Family
-        from six.org import Organisation, Works_at, Located_at
-        from six.address import Residence
-        from six.links import Resides_at
+        from sixx.person import Person
+        from sixx.family import Family
+        from sixx.org import Organisation, Works_at, Located_at
+        from sixx.address import Residence
+        from sixx.links import Resides_at
         assert isinstance(who, (Person, Family, Organisation, Residence,
                                 Resides_at, Located_at, Works_at))
         assert isinstance(tel, Telephone)

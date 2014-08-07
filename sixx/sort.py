@@ -3,10 +3,10 @@
 r'''Data model - sorting.
 '''
 
-from six.node import *
-from six.text import *
-from six.uniq import uniq
-from six.enum import Enum
+from sixx.node import *
+from sixx.text import *
+from sixx.uniq import uniq
+from sixx.enum import Enum
 
 __all__ = ['SortMode', 'SortItem', 'Itemiser', 'cull_references']
 

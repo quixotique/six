@@ -189,8 +189,8 @@ element:
 
 Enum elements can be pickled and unpickled using protocol 2:
 
-    >>> import six.enum
-    >>> six.enum.X = X
+    >>> import sixx.enum
+    >>> sixx.enum.X = X
 
     >>> pickle.loads(pickle.dumps(X.b, 2))
     X.b
@@ -199,7 +199,7 @@ Enum elements can be pickled and unpickled using protocol 2:
 
     >>> pickle.loads(pickle.dumps(X.b, 0)) is X.b
     Traceback (most recent call last):
-    UnpicklingError: six.enum.Enum does not support this protocol
+    UnpicklingError: sixx.enum.Enum does not support this protocol
 
 Every element has an immutable 'e_name' attribute that is its bare name:
 

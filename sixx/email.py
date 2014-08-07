@@ -5,9 +5,9 @@ r'''Data model - email addresses.
 
 from __future__ import absolute_import
 import re
-from six.input import InputError
-from six.node import *
-from six.telephone import At_home, At_work
+from sixx.input import InputError
+from sixx.node import *
+from sixx.telephone import At_home, At_work
 
 __all__ = [
         'Email', 'URI',
@@ -206,10 +206,10 @@ class URI(Node):
 class Has_email(Link):
 
     def __init__(self, who, email, comment=None, timestamp=None):
-        from six.person import Person
-        from six.family import Family
-        from six.org import Organisation, Works_at
-        from six.links import Resides_at
+        from sixx.person import Person
+        from sixx.family import Family
+        from sixx.org import Organisation, Works_at
+        from sixx.links import Resides_at
         assert isinstance(who, (Person, Family, Organisation, Works_at,
                                 Resides_at))
         assert isinstance(email, Email)
@@ -225,10 +225,10 @@ class Has_email_work(Has_email, At_work): pass
 class Has_web_page(Link):
 
     def __init__(self, who, uri, comment=None, timestamp=None):
-        from six.person import Person
-        from six.family import Family
-        from six.org import Organisation, Works_at
-        from six.links import Resides_at
+        from sixx.person import Person
+        from sixx.family import Family
+        from sixx.org import Organisation, Works_at
+        from sixx.links import Resides_at
         assert isinstance(who, (Person, Family, Organisation, Works_at,
                                 Resides_at))
         assert isinstance(uri, URI)

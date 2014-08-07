@@ -7,22 +7,22 @@ import sys
 import locale
 from collections import defaultdict
 from itertools import chain
-from six.multilang import multilang
-from six.sort import *
-from six.node import *
-from six.node import node_predicate
-from six.links import *
-from six.person import *
-from six.family import *
-from six.org import *
-from six.world import *
-from six.address import *
-from six.telephone import *
-from six.email import *
-from six.keyword import *
-from six.data import *
-from six.comment import *
-from six.uniq import uniq
+from sixx.multilang import multilang
+from sixx.sort import *
+from sixx.node import *
+from sixx.node import node_predicate
+from sixx.links import *
+from sixx.person import *
+from sixx.family import *
+from sixx.org import *
+from sixx.world import *
+from sixx.address import *
+from sixx.telephone import *
+from sixx.email import *
+from sixx.keyword import *
+from sixx.data import *
+from sixx.comment import *
+from sixx.uniq import uniq
 
 sort_modes = {'first': SortMode.FIRST_NAME,
               'last':  SortMode.LAST_NAME,
@@ -59,7 +59,7 @@ def report_dump(options, model, predicate, local):
     # Remove unnecessary references.
     cull_references(toplevel)
     # Now format the report.
-    from six.output import Treebuf
+    from sixx.output import Treebuf
     tree = Treebuf(local=local, sort_mode=sort_mode)
     for item in toplevel:
         if item.node is None:

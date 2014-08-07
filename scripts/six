@@ -16,15 +16,15 @@ import os.path
 import cPickle as pickle
 import errno
 from optparse import OptionParser
-import six.parse as parse
-from six.test import run_doctest
-from six.input import InputError
-from six.model import Model, ModelParser
-from six.expr import parse_predicate, ExprError
-from six.reports.dump import report_dump, report_dump_getopt
-#from six.reports.book import report_book, report_book_getopt
-from six.reports.email import report_email, report_email_getopt
-from six.reports.phone import report_phone, report_phone_getopt
+import sixx.parse as parse
+from sixx.test import run_doctest
+from sixx.input import InputError
+from sixx.model import Model, ModelParser
+from sixx.expr import parse_predicate, ExprError
+from sixx.reports.dump import report_dump, report_dump_getopt
+#from sixx.reports.book import report_book, report_book_getopt
+from sixx.reports.email import report_email, report_email_getopt
+from sixx.reports.phone import report_phone, report_phone_getopt
 
 def main():
     locale.setlocale(locale.LC_ALL, '')
@@ -85,7 +85,7 @@ def main():
         if not os.path.isfile(srcpath):
             raise EnvError('file missing', var='SIX_SOURCE')
         cache = os.path.join(os.path.dirname(srcpath),
-                             '.six-cache-' + os.path.basename(srcpath))
+                             '.sixx-cache-' + os.path.basename(srcpath))
         # If the cache exists, attempt to read the model from it.  In the event
         # that it fails to read correctly, silently skip it and proceed to
         # compile the model from source, then save the compiled model in the
@@ -159,7 +159,7 @@ def opt_doctest(option, opt_str, value, parser):
     options, args = op.parse_args(args=parser.rargs)
     modules = args
     if not modules:
-        modules = ['six']
+        modules = ['sixx']
         options.recursive = True
     status = 0
     for module_name in modules:

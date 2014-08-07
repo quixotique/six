@@ -6,24 +6,24 @@ r'''Data model.
 import stackless
 import copy
 from itertools import chain
-from six.struct import struct
-import six.parse as parse
-from six.multilang import multilang
-from six.input import InputError
-from six.world import *
-from six.node import *
-from six.node import link_predicate
-from six.links import *
-from six.person import *
-from six.family import *
-from six.org import *
-from six.address import *
-from six.telephone import *
-from six.email import *
-from six.keyword import *
-from six.date import *
-from six.data import *
-from six.comment import *
+from sixx.struct import struct
+import sixx.parse as parse
+from sixx.multilang import multilang
+from sixx.input import InputError
+from sixx.world import *
+from sixx.node import *
+from sixx.node import link_predicate
+from sixx.links import *
+from sixx.person import *
+from sixx.family import *
+from sixx.org import *
+from sixx.address import *
+from sixx.telephone import *
+from sixx.email import *
+from sixx.keyword import *
+from sixx.date import *
+from sixx.data import *
+from sixx.comment import *
 
 __all__ = ['Model', 'ModelParser', 'In_model', 'is_principal']
 

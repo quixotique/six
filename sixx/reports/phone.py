@@ -4,14 +4,14 @@ r'''Phone numbers report.
 '''
 
 import locale
-from six.sort import *
-from six.model import *
-from six.node import *
-from six.links import *
-from six.person import *
-from six.family import *
-from six.org import *
-from six.reports.dump import dump_comments, telephones, qual_home, qual_work
+from sixx.sort import *
+from sixx.model import *
+from sixx.node import *
+from sixx.links import *
+from sixx.person import *
+from sixx.family import *
+from sixx.org import *
+from sixx.reports.dump import dump_comments, telephones, qual_home, qual_work
 
 def report_phone_getopt(parser):
     lang, enc = locale.getlocale()
@@ -33,7 +33,7 @@ def report_phone(options, model, predicate, local):
         for belongs_to in person.links(outgoing & is_link(Belongs_to)):
             if belongs_to.is_head:
                 itemiser.discard(belongs_to.family)
-    from six.output import Treebuf
+    from sixx.output import Treebuf
     tree = Treebuf(local=local)
     for item in sorted(itemiser.items()):
         if item is not item.single:

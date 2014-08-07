@@ -3,10 +3,10 @@
 r'''Data model - Organisation and Works_at.
 '''
 
-from six.node import *
-from six.sort import *
-from six.uniq import uniq_generator
-from six.multilang import multilang
+from sixx.node import *
+from sixx.sort import *
+from sixx.uniq import uniq_generator
+from sixx.multilang import multilang
 
 __all__ = [
             'Organisation', 'Company', 'Department',
@@ -65,8 +65,8 @@ class Organisation(NamedNode):
         its phone number(s), or if none, then if it is a department, its
         company's place.
         '''
-        from six.links import Resides_at, Has_postal_address, Belongs_to
-        from six.telephone import Has_phone
+        from sixx.links import Resides_at, Has_postal_address, Belongs_to
+        from sixx.telephone import Has_phone
         if self.place:
             return self.place
         return self.derive_only_place(outgoing & is_link(Resides_at),
@@ -75,8 +75,8 @@ class Organisation(NamedNode):
                                       incoming & is_link(Has_department))
 
     def _all_places(self):
-        from six.links import Resides_at, Has_postal_address
-        from six.telephone import Has_phone
+        from sixx.links import Resides_at, Has_postal_address
+        from sixx.telephone import Has_phone
         if self.place:
             yield self.place
         for tup in self.find_nodes((outgoing & is_link(Resides_at)) |
@@ -143,7 +143,7 @@ class Has_department(Link):
         '''
         return self.company.only_place()
 
-from six.links import Association
+from sixx.links import Association
 
 class Works_at(Association):
 
@@ -155,8 +155,8 @@ class Works_at(Association):
 
     def __init__(self, person, org, position=None, is_head=False, sequence=None,
                        timestamp=None):
-        from six.person import Person
-        from six.address import Residence
+        from sixx.person import Person
+        from sixx.address import Residence
         assert isinstance(person, Person)
         assert isinstance(org, (Organisation, Residence))
         if position is not None:

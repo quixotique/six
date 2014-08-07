@@ -3,10 +3,10 @@
 r'''Data model - contextual data.
 '''
 
-from six.world import World
-from six.input import InputError
-from six.node import *
-from six.links import *
+from sixx.world import World
+from sixx.input import InputError
+from sixx.node import *
+from sixx.links import *
 
 __all__ = ['Data', 'Has_context',
            'Data_factory_place', 'Data_factory_nocontext',
@@ -43,10 +43,10 @@ class Has_context(Link):
     '''
 
     def __init__(self, data, context, timestamp=None):
-        from six.links import Is_in
-        from six.person import Person
-        from six.family import Family
-        from six.org import Organisation
+        from sixx.links import Is_in
+        from sixx.person import Person
+        from sixx.family import Family
+        from sixx.org import Organisation
         assert isinstance(data, Data)
         assert isinstance(context, (Association, Is_in, Person, Family, Organisation))
         super(Has_context, self).__init__(data, context, timestamp=timestamp)
@@ -62,7 +62,7 @@ class Data_factory_place(object):
         self._place = place
 
     def __call__(self, part, who, id, value):
-        from six.links import Is_in
+        from sixx.links import Is_in
         if isinstance(who, Link):
             raise InputError('place-contextual data in a non-place context',
                              line=value)
@@ -96,7 +96,7 @@ class Data_factory_context(object):
     '''
 
     def __call__(self, part, context, id, value):
-        from six.links import Is_in
+        from sixx.links import Is_in
         if not isinstance(context, Link):
             place = part.place or context.only_place()
             if not place:

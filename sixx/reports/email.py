@@ -4,14 +4,14 @@ r'''Email address report.
 '''
 
 import locale
-from six.sort import *
-from six.node import *
-from six.node import node_predicate
-from six.links import *
-from six.person import *
-from six.family import *
-from six.org import *
-from six.email import *
+from sixx.sort import *
+from sixx.node import *
+from sixx.node import node_predicate
+from sixx.links import *
+from sixx.person import *
+from sixx.family import *
+from sixx.org import *
+from sixx.email import *
 
 def report_email_getopt(parser):
     lang, enc = locale.getlocale()

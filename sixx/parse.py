@@ -5,9 +5,9 @@ r'''Data file parsing.
 
 import re
 import codecs
-from six.input import *
-from six.multidict import multidict
-from six.struct import struct
+from sixx.input import *
+from sixx.multidict import multidict
+from sixx.struct import struct
 
 def lines(path):
     firstline = file(path).readline()

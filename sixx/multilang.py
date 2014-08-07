@@ -5,8 +5,8 @@ r'''Multi-language text.
 
 import locale
 import re
-from six.input import *
-from six.text import *
+from sixx.input import *
+from sixx.text import *
 
 __all__ = ['multilang', 'expand_multilang_generator']
 

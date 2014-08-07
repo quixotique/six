@@ -3,9 +3,9 @@
 r'''Data model - Link subclasses.
 '''
 
-from six.node import *
-from six.node import link_predicate
-from six.multilang import multilang
+from sixx.node import *
+from sixx.node import link_predicate
+from sixx.multilang import multilang
 
 __all__ = [
         'Is_in', 'is_in_place',
@@ -25,7 +25,7 @@ class Is_in(Link):
     '''
 
     def __init__(self, node, place, timestamp=None):
-        from six.world import Place
+        from sixx.world import Place
         assert isinstance(place, Place)
         super(Is_in, self).__init__(node, place.node, timestamp=timestamp)
         self.node = node
@@ -48,8 +48,8 @@ class Belongs_to(Link):
 
     def __init__(self, person, family, is_head=False, sequence=None,
                        timestamp=None):
-        from six.person import Person
-        from six.family import Family
+        from sixx.person import Person
+        from sixx.family import Family
         assert isinstance(person, Person)
         assert isinstance(family, Family)
         super(Belongs_to, self).__init__(person, family, timestamp=timestamp)
@@ -68,10 +68,10 @@ class Resides_at(Link):
     '''
 
     def __init__(self, who, residence, timestamp=None):
-        from six.person import Person
-        from six.family import Family
-        from six.org import Organisation
-        from six.address import Residence
+        from sixx.person import Person
+        from sixx.family import Family
+        from sixx.org import Organisation
+        from sixx.address import Residence
         assert isinstance(who, (Person, Family, Organisation))
         assert isinstance(residence, Residence)
         super(Resides_at, self).__init__(who, residence, timestamp=timestamp)
@@ -101,10 +101,10 @@ class Has_postal_address(Link):
     '''
 
     def __init__(self, who, postal, timestamp=None):
-        from six.person import Person
-        from six.family import Family
-        from six.org import Organisation, Works_at
-        from six.address import PostalAddress
+        from sixx.person import Person
+        from sixx.family import Family
+        from sixx.org import Organisation, Works_at
+        from sixx.address import PostalAddress
         assert isinstance(who, (Person, Family, Organisation, Works_at))
         assert isinstance(postal, PostalAddress)
         super(Has_postal_address, self).__init__(who, postal, timestamp=timestamp)

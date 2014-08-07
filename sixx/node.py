@@ -4,9 +4,9 @@ r'''Data model - Node and Link superclasses, and link predicate algebra.
 '''
 
 import datetime
-from six.text import *
-from six.uniq import uniq, uniq_generator
-from six.multilang import *
+from sixx.text import *
+from sixx.uniq import uniq, uniq_generator
+from sixx.multilang import *
 
 __all__ = [
         'Node', 'Link', 'NamedNode',

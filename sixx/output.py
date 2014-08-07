@@ -4,7 +4,7 @@ r'''Formatted output.
 '''
 
 import textwrap
-from six.struct import struct
+from sixx.struct import struct
 
 __all__ = ['Treebuf']
 

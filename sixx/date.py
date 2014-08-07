@@ -8,7 +8,7 @@ import locale
 import datetime
 import calendar
 import time
-from six.input import InputError
+from sixx.input import InputError
 
 __all__ = ['Datetime']
 
@@ -114,18 +114,18 @@ class Datetime(object):
         used.  Unfortunately, ISO dates YYYY-MM-DD will have the same problem.
 
             >>> Datetime.parse('mon oct 9 9:48am 2006 +09:30')
-            six.date.Datetime(year=2006, month=10, day=9, hour=9, minute=48, second=0, tzoffset=570, weekday=0)
+            sixx.date.Datetime(year=2006, month=10, day=9, hour=9, minute=48, second=0, tzoffset=570, weekday=0)
 
             >>> Datetime.parse('January 1st, 1970')
-            six.date.Datetime(year=1970, month=1, day=1)
+            sixx.date.Datetime(year=1970, month=1, day=1)
 
             >>> Datetime.parse('January 1st, 1970')
-            six.date.Datetime(year=1970, month=1, day=1)
+            sixx.date.Datetime(year=1970, month=1, day=1)
 
         The day of week is optional:
 
             >>> Datetime.parse('9/10/2006 09:48:00 +0930')
-            six.date.Datetime(year=2006, month=10, day=9, hour=9, minute=48, second=0, tzoffset=570)
+            sixx.date.Datetime(year=2006, month=10, day=9, hour=9, minute=48, second=0, tzoffset=570)
 
         If the day of week is incorrect, an exception is raised:
 
@@ -137,24 +137,24 @@ class Datetime(object):
         age is unknown:
 
             >>> Datetime.parse('mon oct 9 9:48am +09:30')
-            six.date.Datetime(month=10, day=9, hour=9, minute=48, second=0, tzoffset=570, weekday=0)
+            sixx.date.Datetime(month=10, day=9, hour=9, minute=48, second=0, tzoffset=570, weekday=0)
 
             >>> Datetime.parse('September 11th')
-            six.date.Datetime(month=9, day=11)
+            sixx.date.Datetime(month=9, day=11)
 
         You can omit the month:
 
             >>> Datetime.parse('mon 9 9:48am 2006 +09:30')
-            six.date.Datetime(year=2006, day=9, hour=9, minute=48, second=0, tzoffset=570, weekday=0)
+            sixx.date.Datetime(year=2006, day=9, hour=9, minute=48, second=0, tzoffset=570, weekday=0)
 
         You can omit the day, but then the month number may be interpreted as
         the day, so the month is best given textually:
 
             >>> Datetime.parse('oct 9:48am 2006 +09:30')
-            six.date.Datetime(year=2006, month=10, hour=9, minute=48, second=0, tzoffset=570)
+            sixx.date.Datetime(year=2006, month=10, hour=9, minute=48, second=0, tzoffset=570)
 
             >>> Datetime.parse('10/ 9:48am 2006 +09:30')
-            six.date.Datetime(year=2006, day=10, hour=9, minute=48, second=0, tzoffset=570)
+            sixx.date.Datetime(year=2006, day=10, hour=9, minute=48, second=0, tzoffset=570)
 
         Day must be in range:
 
@@ -165,7 +165,7 @@ class Datetime(object):
         You can omit the time:
 
             >>> Datetime.parse('mon oct 9 2006 +09:30')
-            six.date.Datetime(year=2006, month=10, day=9, tzoffset=570, weekday=0)
+            sixx.date.Datetime(year=2006, month=10, day=9, tzoffset=570, weekday=0)
 
         '''
         orig_text = text

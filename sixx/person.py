@@ -4,14 +4,14 @@ r'''Data model.
 '''
 
 import time
-from six.input import InputError
-from six.node import *
-from six.sort import *
-from six.uniq import uniq_generator
-from six.multilang import *
-from six.personname import (PersonName, EnglishSpanishName, SingleName,
+from sixx.input import InputError
+from sixx.node import *
+from sixx.sort import *
+from sixx.uniq import uniq_generator
+from sixx.multilang import *
+from sixx.personname import (PersonName, EnglishSpanishName, SingleName,
                             DecoratedName)
-from six.date import Datetime
+from sixx.date import Datetime
 
 __all__ = ['Person', 'Birthday', 'Born_on']
 
@@ -37,17 +37,17 @@ class Person(NamedNode):
         his/her postal address(es), or if none, then his/her phone number(s),
         or if none, then his/her family's place.
         '''
-        from six.links import Resides_at, Has_postal_address, Belongs_to
-        from six.telephone import Has_phone
+        from sixx.links import Resides_at, Has_postal_address, Belongs_to
+        from sixx.telephone import Has_phone
         return self.derive_only_place(outgoing & is_link(Resides_at),
                                       outgoing & is_link(Has_postal_address),
                                       outgoing & is_link(Belongs_to),
                                       outgoing & is_link(Has_phone),)
 
     def _all_places(self):
-        from six.links import Resides_at, Has_postal_address, Belongs_to
-        from six.org import Works_at, Has_department
-        from six.telephone import Has_phone
+        from sixx.links import Resides_at, Has_postal_address, Belongs_to
+        from sixx.org import Works_at, Has_department
+        from sixx.telephone import Has_phone
         for tup in self.find_nodes((outgoing & is_link(Resides_at)) |
                                    (outgoing & is_link(Works_at)) |
                                    (incoming & is_link(Has_department)) |
@@ -165,7 +165,7 @@ class Person(NamedNode):
         r'''A person can belong to exactly zero or one familiy.
         @return: tuple (None, None) or tuple (Belongs_to, Family)
         '''
-        from six.links import Belongs_to
+        from sixx.links import Belongs_to
         families = list(self.links(outgoing & is_link(Belongs_to)))
         if not families:
             return None, None

@@ -4,9 +4,9 @@ r'''Country and area.
 '''
 
 import re
-from six.multilang import multilang
-from six.input import InputError
-from six.node import *
+from sixx.multilang import multilang
+from sixx.input import InputError
+from sixx.node import *
 
 __all__ = ['World', 'Country', 'Area', 'Place', 'Has_country', 'Has_area']
 

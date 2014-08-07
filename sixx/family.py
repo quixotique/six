@@ -4,11 +4,11 @@ r'''Data model - Family.
 '''
 
 from collections import defaultdict
-from six.node import *
-from six.person import Person
-from six.uniq import uniq_generator
-from six.multilang import *
-from six.sort import SortMode
+from sixx.node import *
+from sixx.person import Person
+from sixx.uniq import uniq_generator
+from sixx.multilang import *
+from sixx.sort import SortMode
 
 __all__ = ['Family']
 
@@ -68,15 +68,15 @@ class Family(NamedNode):
         r'''A family's place depends on its residence(s), or if there are none,
         its postal address(es), or if none, its phone number(s).
         '''
-        from six.links import Resides_at, Has_postal_address
-        from six.telephone import Has_phone
+        from sixx.links import Resides_at, Has_postal_address
+        from sixx.telephone import Has_phone
         return self.derive_only_place(outgoing & is_link(Resides_at),
                                       outgoing & is_link(Has_postal_address),
                                       outgoing & is_link(Has_phone))
 
     def _all_places(self):
-        from six.links import Resides_at, Has_postal_address, Belongs_to
-        from six.telephone import Has_phone
+        from sixx.links import Resides_at, Has_postal_address, Belongs_to
+        from sixx.telephone import Has_phone
         for tup in self.find_nodes((outgoing & is_link(Resides_at)) |
                                    (outgoing & is_link(Has_postal_address)) |
                                    (incoming & is_link(Belongs_to)) |
@@ -85,7 +85,7 @@ class Family(NamedNode):
                 yield tup[-1].place
 
     def heads(self):
-        from six.links import Belongs_to
+        from sixx.links import Belongs_to
         for link in sorted(self.links(incoming & is_link(Belongs_to) &
                                       is_link(test_attr('is_head'))),
                            key=lambda l: (not l.person.full_name_known(),
@@ -94,7 +94,7 @@ class Family(NamedNode):
             yield link.person
 
     def tails(self):
-        from six.links import Belongs_to
+        from sixx.links import Belongs_to
         for link in sorted(self.links(incoming & is_link(Belongs_to) &
                                       ~is_link(test_attr('is_head')))):
             yield link.person

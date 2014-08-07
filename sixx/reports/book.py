@@ -7,22 +7,22 @@ import time
 from collections import defaultdict
 from itertools import chain
 
-from six.input import InputError
-from six.text import sortstr, text_sort_key
-from six.uniq import uniq
-from six.multilang import multilang
-from six.sort import *
-from six.node import *
-from six.node import node_predicate
-from six.links import *
-from six.person import *
-from six.family import *
-from six.org import *
-from six.comment import *
-from six.address import *
-from six.telephone import *
-from six.email import *
-from six.struct import struct
+from sixx.input import InputError
+from sixx.text import sortstr, text_sort_key
+from sixx.uniq import uniq
+from sixx.multilang import multilang
+from sixx.sort import *
+from sixx.node import *
+from sixx.node import node_predicate
+from sixx.links import *
+from sixx.person import *
+from sixx.family import *
+from sixx.org import *
+from sixx.comment import *
+from sixx.address import *
+from sixx.telephone import *
+from sixx.email import *
+from sixx.struct import struct
 
 def report_book_getopt(parser):
     parser.set_defaults(pagesize='filofax', sections='none')

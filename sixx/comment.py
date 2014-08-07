@@ -3,8 +3,8 @@
 r'''Comment - miscellaneous text that can be attached to just about any node.
 '''
 
-from six.input import InputError
-from six.node import *
+from sixx.input import InputError
+from sixx.node import *
 
 __all__ = ['Comment', 'Has_comment',
           ]

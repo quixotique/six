@@ -3,10 +3,10 @@
 r'''Data model - addresses.
 '''
 
-from six.multilang import multilang
-from six.input import InputError
-from six.node import *
-from six.world import *
+from sixx.multilang import multilang
+from sixx.input import InputError
+from sixx.node import *
+from sixx.world import *
 
 __all__ = ['Residence', 'PostalAddress', 'Location']
 
@@ -26,7 +26,7 @@ class Address(Node):
         super(Address, self).__init__()
         self.lines = tuple(lines)
         self.place = place
-        from six.links import Is_in
+        from sixx.links import Is_in
         Is_in(self, place)
 
     def as_unicode(self, with_country=True):
