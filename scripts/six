@@ -22,7 +22,7 @@ from six.input import InputError
 from six.model import Model, ModelParser
 from six.expr import parse_predicate, ExprError
 from six.reports.dump import report_dump, report_dump_getopt
-from six.reports.book import report_book, report_book_getopt
+#from six.reports.book import report_book, report_book_getopt
 from six.reports.email import report_email, report_email_getopt
 from six.reports.phone import report_phone, report_phone_getopt
 
