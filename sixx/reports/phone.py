@@ -25,7 +25,7 @@ def report_phone(options, model, predicate, local):
         predicate = is_principal & is_other(instance_p(Person) | instance_p(Company))
     tkw = {'fax': False, 'bold': True}
     itemiser = Itemiser()
-    itemiser.update(model.nodes(is_other(instance_p(NamedNode) & predicate)))
+    itemiser.update(model.nodes(is_other(instance_p(NamedNode)) & predicate))
     # Remove entries for families for which one or more of the heads was found.
     people = [node for node in itemiser if isinstance(node, Person)]
     for person in people:
