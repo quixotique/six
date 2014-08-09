@@ -43,10 +43,13 @@ class Email(Node):
             name = str(name)
             if encoding:
                 try:
-                    name = name.encode(encoding)
+                    name.encode(encoding)
                 except UnicodeEncodeError:
                     from email.header import Header
-                    name = str(Header(name, 'iso-8859-1'))
+                    try:
+                        name = Header(name, 'iso-8859-1').encode()
+                    except UnicodeEncodeError:
+                        name = Header(name, 'utf-8').encode()
             m = self._re_atoms.match(name)
             if not (m and m.end() == len(name)):
                 name = self._quote(name)
