@@ -49,6 +49,9 @@ def main():
     op.add_option('-o', '--output',
                   action='store', type='string', dest='output_path',
                   help='write output to file pathname instead of stdout')
+    op.add_option('-f', '--force',
+                  action='store_true', dest='force', default=False,
+                  help='force re-compilation')
     op.disable_interspersed_args()
     try:
         # Parse the first argument(s) as the report type option.  If absent,
@@ -91,8 +94,10 @@ def main():
         # compile the model from source, then save the compiled model in the
         # cache.
         model = None
-        if (    os.path.exists(cache) and
-                (os.stat(srcpath).st_mtime <= os.stat(cache).st_mtime)):
+        if (    not options.force
+            and os.path.exists(cache)
+            and (os.stat(srcpath).st_mtime <= os.stat(cache).st_mtime)
+        ):
             try:
                 with open(cache, 'rb') as f:
                     #print('loading %r ...' % cache, file=sys.stderr)
