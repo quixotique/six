@@ -3,8 +3,8 @@
 r'''Data model.
 '''
 
-import stackless
 import copy
+import inspect
 from itertools import chain
 from sixx.struct import struct
 import sixx.parse as parse
@@ -26,6 +26,9 @@ from sixx.data import *
 from sixx.comment import *
 
 __all__ = ['Model', 'ModelParser', 'In_model', 'is_principal']
+
+def coroutine(func):
+    return func
 
 class Model(Node):
 
@@ -111,6 +114,11 @@ class FindError(LookupError):
     '''
     pass
 
+class Terminate(Exception):
+    r'''A Terminate exception is used to prematurely terminate parsing.
+    '''
+    pass
+
 class ModelParser(object):
 
     r'''A model parser provides methods for compiling text source into a model.
@@ -124,15 +132,14 @@ class ModelParser(object):
         self.dfactory = {}
         self.dfactory_default = Data_factory_context()
         self.last_dfactory = None
-        self._data_block_parsers = []
-        self._suspended = set()
         self._no_suspend = False
+        self._tasks = set()
 
     def parse_block(self, block):
         r'''Parse a block of lines and add the data to the data model.
         The block is either a "control" block (lines starting with '%') or
         a data block.  Each is handled separately.
-        
+
         Control blocks are parsed immediately, and modify the 'world' and
         'defaults' attributes of the parser.  These attributes are used when
         parsing data blocks.
@@ -154,9 +161,7 @@ class ModelParser(object):
                 'data': self.parse_control_data,
             })
         else:
-            parser = stackless.tasklet(self._parse_data_block)
-            parser.setup(block, copy.copy(self.defaults))
-            parser.run()
+            self._tasks.add(self._parse_data_block(block, copy.copy(self.defaults)))
 
     def finish_parsing(self):
         r'''Finish parsing all the data blocks that were started by
@@ -170,36 +175,39 @@ class ModelParser(object):
         attribute set, which will cause the first one that wakes to raise
         LookupError.
         '''
-        while self._suspended:
-            retry = self._suspended
-            self._suspended = set()
+        while self._tasks:
+            retry = self._tasks
+            self._tasks = set()
             try:
                 hung = len(retry)
                 while retry:
-                    channel, reason = retry.pop()
-                    channel.close()
-                    channel.send(None)
-                if len(self._suspended) == hung:
-                    # This debug can help resolve circular references.
-                    #for channel, reason in self._suspended:
-                    #    print reason
+                    task = retry.pop()
+                    reason = next(task, None)
+                    if reason is not None:
+                        #print(reason)
+                        self._tasks.add(task)
+                if len(self._tasks) == hung:
                     self._no_suspend = True
             finally:
-                self._suspended.update(retry)
+                self._tasks.update(retry)
 
     def finalise(self):
         r'''Shut down all remaining, suspended tasklets.  This should be done
         before calling sys.exit(), otherwise things could get ugly.
         '''
-        while self._suspended:
-            self._suspended.pop()[0].send_exception(TaskletExit)
+        while self._tasks:
+            try:
+                self._tasks.pop().throw(Terminate)
+            except Terminate:
+                pass
 
+    @coroutine
     def find(self, typ, text):
         r'''Call self.model.find() and if it fails to find any node, suspend
         the current tasklet and queue ourselves to be resumed later.
         '''
         while True:
-            self._suspend('find(%r, %r)' % (typ, text))
+            yield 'find(%r, %r)' % (typ, text)
             try:
                 return self.model.find(typ, text)
             except FindError as e:
@@ -209,16 +217,7 @@ class ModelParser(object):
                 # Found no node.  If we are bailing out, then re-raise the
                 # exception, otherwise suspend and try again.
                 if self._no_suspend:
-                    raise 
-
-    def _suspend(self, why=None):
-        r'''Suspend the running tasklet until awoken.
-        '''
-        ch = stackless.channel()
-        self._suspended.add((ch, why))
-        ch.receive()
-        assert ch not in (c for c, w in self._suspended)
-        del ch
+                    raise
 
     def parse_default(self, text):
         r'''Parse a '%default' control line, and update the 'defaults' struct
@@ -284,6 +283,7 @@ class ModelParser(object):
             raise InputError('duplicate data declaration', line=text)
         self.dfactory[id] = self.last_dfactory
 
+    @coroutine
     def _parse_data_block(self, block, defaults):
         r'''Parse a data block.  This callable is invoked as a tasklet by
         parse_block().
@@ -333,7 +333,7 @@ class ModelParser(object):
         if len(members) == 0:
             # "common" could be a company or department, or person, or both, or
             # if neither then it must define a residence.  Never a family.
-            org = self.parse_company_or_dept(common, optional=True)
+            org = yield from self.parse_company_or_dept(common, optional=True)
             per = self.parse_person(common, optional=True, with_aka=not org,
                                     principal=False if org else True)
             if org:
@@ -343,7 +343,7 @@ class ModelParser(object):
             # Now that all the named nodes are registered, we can parse contact
             # details (which might suspend in find()).
             if org:
-                self.parse_org_con(common, org)
+                yield from self.parse_org_con(common, org)
                 if per:
                     self.parse_works_at(common, per, org)
                 else:
@@ -359,16 +359,15 @@ class ModelParser(object):
             # associated with the company, because the "Works_at" link may help
             # determine the person's place.  Or may not.
             if per:
-                self.parse_person_con(common, per, org)
+                yield from self.parse_person_con(common, per, org)
         elif len(members) == 1:
             # "Common" must be a company or department.  "Members[0]" must be a
             # person and/or department (if common is not a department).
-            org = self.parse_company_or_dept(common, optional=False)
+            org = yield from self.parse_company_or_dept(common, optional=False)
             self.parse_residences(common, org)
             dept = None
             if not isinstance(org, Department):
-                dept = self.parse_dept(members[0], org, optional=True,
-                                       with_aka=True)
+                dept = yield from self.parse_dept(members[0], org, optional=True, with_aka=True)
             per = self.parse_person(members[0], optional=bool(dept),
                                     principal=members[0].delim == '+',
                                     with_aka=not dept)
@@ -378,13 +377,13 @@ class ModelParser(object):
                 self.parse_residences(members[0], per)
             # Now that all the named nodes are registered, we can parse contact
             # details (which might suspend in find()).
-            self.parse_org_con(common, org)
+            yield from self.parse_org_con(common, org)
             self.parse_org_extra(common, org)
             if dept:
-                self.parse_org_con(members[0], dept)
+                yield from self.parse_org_con(members[0], dept)
             if per:
                 self.parse_works_at(members[0], per, dept or org)
-                self.parse_person_con(members[0], per, dept)
+                yield from self.parse_person_con(members[0], per, dept)
             else:
                 assert dept
                 self.parse_org_extra(members[0], dept)
@@ -394,7 +393,7 @@ class ModelParser(object):
             # each member part must define either a person and/or department.
             # If it is a department, then each member must define a person.  If
             # a family, then each member part must define a person.
-            org = self.parse_company_or_dept(common, optional=True)
+            org = yield from self.parse_company_or_dept(common, optional=True)
             if org:
                 self.parse_residences(common, org)
             else:
@@ -404,7 +403,7 @@ class ModelParser(object):
             for member in members:
                 member.dept = None
                 if org and not isinstance(org, Department):
-                    member.dept = self.parse_dept(member, org, optional=True,
+                    member.dept = yield from self.parse_dept(member, org, optional=True,
                                                   with_aka=True)
                 member.person = self.parse_person(member,
                                                   optional=bool(member.dept),
@@ -428,13 +427,13 @@ class ModelParser(object):
             # Now that all the named nodes are registered, we can parse contact
             # details (which might suspend in find()).
             if org:
-                self.parse_org_con(common, org)
+                yield from self.parse_org_con(common, org)
                 self.parse_org_extra(common, org)
             else:
-                self.parse_family_con(common, fam)
+                yield from self.parse_family_con(common, fam)
             for member in members:
                 if member.dept:
-                    self.parse_org_con(member, member.dept)
+                    yield from self.parse_org_con(member, member.dept)
                 if org:
                     if member.person:
                         self.parse_works_at(member, member.person,
@@ -444,7 +443,7 @@ class ModelParser(object):
                         self.parse_org_extra(member, member.dept)
                 else:
                     self.parse_contacts_work(member, member.person)
-                self.parse_person_con(member, member.person, member.dept)
+                yield from self.parse_person_con(member, member.person, member.dept)
         # Now find lines that were not parsed, and complain about them.
         missed = set()
         for part in chain([common], members):
@@ -474,6 +473,7 @@ class ModelParser(object):
                     part.place = place
                     found_in = True
 
+    @coroutine
     def parse_company_or_dept(self, part, optional=False):
         r'''Parse a company and/or any department thereof.
         '''
@@ -486,13 +486,13 @@ class ModelParser(object):
             company = self.model.register(Company(name=name, aka=aka,
                                                   prefer=prefer))
             company.place = part.place
-        dept = self.parse_dept(part, company, optional=company or optional,
-                               with_aka=not company)
+        dept = yield from self.parse_dept(part, company, optional=company or optional, with_aka=not company)
         org = dept or company
         if not org and not optional:
             raise InputError('missing company or department', line=part)
         return org
 
+    @coroutine
     def parse_dept(self, part, company=None, optional=False, with_aka=False):
         r'''Parse a department and connect it to its parent organisation.
         '''
@@ -508,17 +508,17 @@ class ModelParser(object):
         if with_aka:
             aka = list(map(multilang.optparse, part.mgetvalue('aka', [])))
         prefer = sorted([name] + aka, key=lambda s: s.loc())[0]
-        dept = self.model.register(Department(name=name, aka=aka,
-                                              prefer=prefer))
+        dept = self.model.register(Department(name=name, aka=aka, prefer=prefer))
         dept.place = part.place
         if not company:
-            company = self.find(Company, part.getvalue('of'))
+            company = yield from self.find(Company, part.getvalue('of'))
         try:
             Has_department(company, dept, is_head=is_head)
         except ValueError as e:
             raise InputError(e, line=name)
         return dept
 
+    @coroutine
     def parse_org_con(self, part, org):
         r'''Parse contact details that may be associated with an organisation
         (company or department), skipping those that could pertain to a person,
@@ -527,8 +527,8 @@ class ModelParser(object):
         '''
         # First, parse details that can provide place context when parsing
         # telephone numbers.
-        self.parse_homes(part, org)
-        self.parse_locations(part, org)
+        yield from self.parse_homes(part, org)
+        yield from self.parse_locations(part, org)
         self.parse_con(part, org, 'po', PostalAddress, Has_postal_address)
         # Now parse the various contact details - phone/fax numbers, email
         # addresses, web pages, etc.  We DON'T parse mobile phone numbers here,
@@ -544,13 +544,13 @@ class ModelParser(object):
         # context provided by residence and phone numbers already parsed.
         self.parse_con(part, org, 'com', Comment, Has_comment)
         self.parse_data(part, org)
-        self.parse_assoc(part, org, 'with', NamedNode, With, self.parse_assoc_contacts)
-        self.parse_assoc(part, org, 'ex', NamedNode, Ex, self.parse_assoc_contacts)
+        yield from self.parse_assoc(part, org, 'with', NamedNode, With, self.parse_assoc_contacts)
+        yield from self.parse_assoc(part, org, 'ex', NamedNode, Ex, self.parse_assoc_contacts)
         self.parse_keywords(part, org)
         # Parse any 'in' sub-parts.
         for sub in (s for v, s in part.mget('in', []) if s):
-            self.parse_homes(sub, org)
-            self.parse_locations(sub, org)
+            yield from self.parse_homes(sub, org)
+            yield from self.parse_locations(sub, org)
             self.parse_con(sub, org, 'po', PostalAddress, Has_postal_address)
             self.parse_con(sub, org, 'ph', Telephone, Has_fixed_home)
             self.parse_con(sub, org, 'fax', Telephone, Has_fax_home)
@@ -566,10 +566,11 @@ class ModelParser(object):
         for sub in (s for v, s in part.mget('in', []) if s):
             self.parse_con(sub, org, 'mob', Telephone, Has_mobile_home)
 
+    @coroutine
     def parse_family_con(self, part, fam):
         r'''Parse a family's contact details.
         '''
-        self.parse_homes(part, fam)
+        yield from self.parse_homes(part, fam)
         self.parse_con(part, fam, 'phh', Telephone, Has_fixed_home)
         self.parse_con(part, fam, 'faxh', Telephone, Has_fax_home)
         self.parse_con(part, fam, 'ph', Telephone, Has_fixed)
@@ -581,12 +582,12 @@ class ModelParser(object):
         self.parse_con(part, fam, 'www', URI, Has_web_page)
         self.parse_con(part, fam, 'com', Comment, Has_comment)
         self.parse_data(part, fam)
-        self.parse_assoc(part, fam, 'with', NamedNode, With, self.parse_assoc_contacts)
-        self.parse_assoc(part, fam, 'ex', NamedNode, Ex, self.parse_assoc_contacts)
+        yield from self.parse_assoc(part, fam, 'with', NamedNode, With, self.parse_assoc_contacts)
+        yield from self.parse_assoc(part, fam, 'ex', NamedNode, Ex, self.parse_assoc_contacts)
         self.parse_keywords(part, fam)
         # Parse any 'in' sub-parts.
         for sub in (s for v, s in part.mget('in', []) if s):
-            self.parse_homes(sub, fam)
+            yield from self.parse_homes(sub, fam)
             self.parse_con(sub, fam, 'po', PostalAddress, Has_postal_address)
             self.parse_con(sub, fam, 'mob', Telephone, Has_mobile_home)
             self.parse_con(sub, fam, 'ph', Telephone, Has_fixed_home)
@@ -594,8 +595,7 @@ class ModelParser(object):
             self.parse_data(sub, fam)
         return fam
 
-    def parse_person(self, part, optional=False, with_aka=False,
-                                 principal=True):
+    def parse_person(self, part, optional=False, with_aka=False, principal=True):
         r'''Parse a person's name and other details into a Person node.
         '''
         pn = Person.initargs(part)
@@ -606,8 +606,7 @@ class ModelParser(object):
         aka = None
         if with_aka:
             aka = list(map(multilang.optparse, part.mgetvalue('aka', [])))
-        per = self.model.register(Person.from_initargs(pn, aka=aka),
-                                  principal=principal)
+        per = self.model.register(Person.from_initargs(pn, aka=aka), principal=principal)
         # Birthday.
         if 'bd' in part:
             birthday, year = Birthday.parse(part.getvalue('bd'))
@@ -615,6 +614,7 @@ class ModelParser(object):
             Born_on(per, birthday, year=year)
         return per
 
+    @coroutine
     def parse_person_con(self, part, per, org=None):
         r'''Parse a person's contact details and attach them to a given Person
         node.
@@ -627,7 +627,7 @@ class ModelParser(object):
         # organisation, then the 'po' lines pertain to the organisation so we
         # don't parse them here.
         if not org:
-            self.parse_homes(part, per)
+            yield from self.parse_homes(part, per)
             self.parse_con(part, per, 'po', PostalAddress, Has_postal_address)
         # Now parse the various contact details - phone/fax/mobile numbers,
         # email addresses, web pages, etc.  If this part is also used to
@@ -653,23 +653,23 @@ class ModelParser(object):
             # Parse any 'work', 'work-', 'with', and 'ex' sub-parts.  The
             # 'work-' variant does not make the person a head of the
             # organisation they work for.
-            self.parse_assoc(part, per, 'work', (Organisation, Residence),
-                             Works_at, self.parse_assoc_contacts_work,
-                             is_head=True)
-            self.parse_assoc(part, per, 'work-', (Organisation, Residence),
-                             Works_at, self.parse_assoc_contacts_work,
-                             is_head=False)
-            self.parse_assoc(part, per, 'with', NamedNode, With,
-                             self.parse_assoc_contacts)
-            self.parse_assoc(part, per, 'ex', NamedNode, Ex,
-                             self.parse_assoc_contacts)
+            yield from self.parse_assoc(part, per, 'work', (Organisation, Residence),
+                                        Works_at, self.parse_assoc_contacts_work,
+                                        is_head=True)
+            yield from self.parse_assoc(part, per, 'work-', (Organisation, Residence),
+                                        Works_at, self.parse_assoc_contacts_work,
+                                        is_head=False)
+            yield from self.parse_assoc(part, per, 'with', NamedNode, With,
+                                        self.parse_assoc_contacts)
+            yield from self.parse_assoc(part, per, 'ex', NamedNode, Ex,
+                                        self.parse_assoc_contacts)
         # Parse any 'in' sub-parts.
         for sub in (s for v, s in part.mget('in', []) if s):
             self.parse_con(sub, per, 'mob', Telephone, Has_mobile)
             self.parse_con(sub, per, 'phh', Telephone, Has_fixed_home)
             self.parse_con(sub, per, 'faxh', Telephone, Has_fax_home)
             if not org:
-                self.parse_homes(sub, per)
+                yield from self.parse_homes(sub, per)
                 self.parse_con(sub, per, 'po', PostalAddress, Has_postal_address)
                 self.parse_con(sub, per, 'ph', Telephone, Has_fixed_home)
                 self.parse_con(sub, per, 'fax', Telephone, Has_fax_home)
@@ -702,8 +702,8 @@ class ModelParser(object):
         self.parse_con(part, who, 'faxw', Telephone, Has_fax_work)
         self.parse_con(part, who, 'emw', Email, Has_email_work)
 
-    def parse_assoc(self, part, who, key, ntype, ltype, parse_sub=None,
-                          is_head=None):
+    @coroutine
+    def parse_assoc(self, part, who, key, ntype, ltype, parse_sub=None, is_head=None):
         r'''Parse an association line, look up the referred node, and link it
         to a given node with an Association link or subclass thereof.  Parse
         any contact details, keywords, data, and comments that pertain to the
@@ -712,7 +712,7 @@ class ModelParser(object):
         if key in part:
             for name, sub in part.mget(key):
                 try:
-                    oth = self.find(ntype, name)
+                    oth = yield from self.find(ntype, name)
                 except LookupError as e:
                     raise InputError(e, char=name)
                 if sub:
@@ -724,8 +724,10 @@ class ModelParser(object):
                                       timestamp=(sub or part).updated,
                                       is_head=is_head)
                 if sub:
-                    if parse_sub:
-                        parse_sub(sub, ass)
+                    if parse_sub is not None:
+                        g = parse_sub(sub, ass)
+                        if inspect.isgenerator(g):
+                            yield from g
                     self.parse_keywords(sub, ass)
                     self.parse_data(sub, ass)
                     self.parse_con(sub, ass, 'com', Comment, Has_comment)
@@ -761,6 +763,7 @@ class ModelParser(object):
         self.parse_con(part, ass, 'fax', Telephone, Has_fax)
         self.parse_con(part, ass, 'em', Email, Has_email)
 
+    @coroutine
     def parse_assoc_contacts_work(self, part, ass):
         r'''Callback to pass to parse_assoc(), which parses contact details
         for a person-organisation Works_at association.
@@ -779,8 +782,8 @@ class ModelParser(object):
         # provided by residence and phone numbers already parsed.
         self.parse_con(part, ass, 'com', Comment, Has_comment)
         self.parse_data(part, ass)
-        self.parse_assoc(part, ass, 'with', NamedNode, With)
-        self.parse_assoc(part, ass, 'ex', NamedNode, Ex)
+        yield from self.parse_assoc(part, ass, 'with', NamedNode, With)
+        yield from self.parse_assoc(part, ass, 'ex', NamedNode, Ex)
         self.parse_keywords(part, ass)
 
     def parse_con(self, part, who, key, ntype, ltype):
@@ -834,6 +837,7 @@ class ModelParser(object):
             self.parse_con(sub, res, 'com', Comment, Has_comment)
         return res
 
+    @coroutine
     def parse_homes(self, part, who):
         r'''Parse 'home' lines for a person, family or organisation, which
         define one or more residences (optionally with contact details) for
@@ -841,7 +845,7 @@ class ModelParser(object):
         '''
         for value, sub in part.mget('home', []):
             try:
-                res = self.find(Residence, value)
+                res = yield from self.find(Residence, value)
             except LookupError as e:
                 raise InputError(e, char=value)
             if sub:
@@ -854,13 +858,14 @@ class ModelParser(object):
                 self.parse_con(sub, r, 'fax', Telephone, Has_fax)
                 self.parse_con(sub, r, 'com', Comment, Has_comment)
 
+    @coroutine
     def parse_locations(self, part, who):
         r'''Parse 'loc' lines for an organisation, which define the host
         residences (optionally with contact details) for that organisation.
         '''
         for value, sub in part.mget('loc', []):
             try:
-                host = self.find(Organisation, value)
+                host = yield from self.find(Organisation, value)
             except LookupError as e:
                 raise InputError(e, char=value)
             if sub:
