@@ -192,13 +192,13 @@ class multilang(object):
         produce this multilang.  If the multilang was not produced by parsing
         input, then return None.
 
-            >>> m = multilang.parse(itext('"abc"', loc=5))[1]
+            >>> m = multilang.parse(itext('"abc"', loc=8))[1]
             >>> m.loc()
-            5
+            8
 
-            >>> m = multilang(itext('abc', loc=5))
+            >>> m = multilang(itext('abc', loc=15))
             >>> m.loc()
-            5
+            15
 
             >>> m = multilang.parse('"abc"')[1]
             >>> m.loc() is None
@@ -245,25 +245,23 @@ class multilang(object):
             m = class_._re_parse.match(text)
             if m is None:
                 break
-            text = text[m.end():]
             lang = m.group(1) and str(m.group(1))
-            string = m.group(2)
+            string = text[m.start(2):m.end(2)]
+            matched = text[m.start():m.end()]
+            text = text[m.end():]
             if lang:
                 if bare is not None:
-                    raise InputError('bare text mixed with language text',
-                                     char=m.group())
+                    raise InputError('bare text mixed with language text', char=matched)
                 if alt is None:
                     alt = dict()
                 if lang in alt:
-                    raise InputError('duplicate language %r' % lang,
-                                     char=m.group())
+                    raise InputError('duplicate language %r' % lang, char=matched)
                 alt[lang] = string
             else:
                 if bare is not None:
-                    raise InputError('more than one bare text', char=m.group())
+                    raise InputError('more than one bare text', char=matched)
                 if alt is not None:
-                    raise InputError('bare text mixed with language text',
-                                     char=m.group())
+                    raise InputError('bare text mixed with language text', char=matched)
                 bare = string
         obj = None
         if bare is not None:
