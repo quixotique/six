@@ -71,7 +71,7 @@ class Keyword(Node):
         spl = text.split(None, 1)
         keyword = spl.pop(0)
         if not class_._re_keyword.match(keyword):
-            raise InputError('malformed keyword %r' % keyword, char=keyword)
+            raise InputError('malformed keyword %r' % str(keyword), char=keyword)
         comment = spl and spl[0] or None
         return class_(str(keyword)), comment
 
