@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.4
+#!/usr/bin/env python3
 # vim: sw=4 sts=4 et fileencoding=utf-8 nomod
 
 from distutils.core import setup
