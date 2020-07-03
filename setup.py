@@ -7,7 +7,7 @@ setup(name='six',
       version='0.1',
       description='Network database of personal contacts',
       author='Andrew Bettison',
-      author_email='andrewb@zip.com.au',
+      author_email='andrew@iverin.com.au',
       packages=['sixx', 'sixx/reports'],
       scripts=['scripts/six']
      )
