@@ -69,7 +69,7 @@ def report_phone(options, model, predicate, local):
                     if isinstance(node1, Resides_at):
                         comment.append(node1.residence.lines[0])
                 telephones(tup[-1], sub, comment=', '.join(comment), **tkw)
-            for link in sorted(node.links(incoming & is_link(Belongs_to))):
+            for link in node.links(incoming & is_link(Belongs_to)):
                 sub.add(link.person.familiar_name(), underline=True)
                 sub.nl()
                 subsub = sub.sub()
@@ -110,7 +110,7 @@ def telephones_org(org, tree, **tkw):
             if isinstance(node1, Resides_at):
                 comment.append(node1.residence.lines[0])
         telephones(tup[-1], tree, comment=', '.join(comment), **tkw)
-    for link in sorted(org.links(incoming & is_link(Works_at))):
+    for link in org.links(incoming & is_link(Works_at)):
         tree.add(link.person, underline=True)
         if link.position:
             tree.add(', ', link.position)
