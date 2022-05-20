@@ -3,7 +3,7 @@
 
 from distutils.core import setup
 
-setup(name='six',
+setup(name='sixx',
       version='0.1',
       description='Network database of personal contacts',
       author='Andrew Bettison',
