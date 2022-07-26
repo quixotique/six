@@ -4,10 +4,10 @@ r'''Data model - Node and Link superclasses, and link predicate algebra.
 '''
 
 import datetime
+from collections.abc import Callable
 from sixx.text import *
 from sixx.uniq import uniq, uniq_generator
 from sixx.multilang import *
-import collections
 
 __all__ = [
         'Node', 'Link', 'NamedNode',
@@ -662,7 +662,7 @@ class NamedNode(Node):
         Otherwise, a simple string matches the text if it starts with the text.
         '''
         for name in self.names():
-            if hasattr(name, 'matches') and isinstance(name.matches, collections.Callable):
+            if hasattr(name, 'matches') and isinstance(name.matches, Callable):
                 if name.matches(text):
                     return True
             elif name == text:
@@ -682,7 +682,7 @@ def name_imatches(text):
         if not isinstance(node, NamedNode):
             return False
         for name in node.names():
-            if hasattr(name, 'imatches') and isinstance(name.imatches, collections.Callable):
+            if hasattr(name, 'imatches') and isinstance(name.imatches, Callable):
                 if name.imatches(itext):
                     return True
             elif itext in text_match_key(name):

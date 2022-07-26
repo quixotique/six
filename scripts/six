@@ -9,7 +9,7 @@ packages contained within them.
 '''
 
 import sys
-import collections.abc
+from collections.abc import Callable
 sys.path.pop(0)
 import locale
 import os
@@ -34,7 +34,7 @@ def main():
     # start with "report_".
     reports = dict([(name[7:], (obj, globals().get(name + '_getopt')))
                             for name, obj in globals().items()
-                            if isinstance(obj, collections.abc.Callable) and name.startswith('report_')])
+                            if isinstance(obj, Callable) and name.startswith('report_')])
     # Must be at least one report defined.
     assert reports
     op = OptionParser(usage=

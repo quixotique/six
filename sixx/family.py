@@ -4,12 +4,12 @@ r'''Data model - Family.
 '''
 
 from collections import defaultdict
+from collections.abc import Callable
 from sixx.node import *
 from sixx.person import Person
 from sixx.uniq import uniq_generator
 from sixx.multilang import *
 from sixx.sort import SortMode
-import collections
 
 __all__ = ['Family']
 
@@ -149,7 +149,7 @@ class Family(NamedNode):
             else:
                 return True
         for name in self.aka:
-            if hasattr(name, 'matches') and isinstance(name.matches, collections.Callable):
+            if hasattr(name, 'matches') and isinstance(name.matches, Callable):
                 if name.matches(text):
                     return True
             elif name.startswith(text):

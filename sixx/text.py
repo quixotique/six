@@ -4,7 +4,7 @@ r'''Data model - text utilities.
 '''
 
 import unicodedata
-import collections
+from collections.abc import Callable
 
 __all__ = ['text_sort_key', 'text_match_key', 'sortstr']
 
@@ -24,7 +24,7 @@ def text_sort_key(text):
         'jose munoz guell'
 
     '''
-    if hasattr(text, 'sortstr') and isinstance(text.sortstr, collections.Callable):
+    if hasattr(text, 'sortstr') and isinstance(text.sortstr, Callable):
         text = text.sortstr()
     else:
         text = str(text)

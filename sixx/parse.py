@@ -5,10 +5,10 @@ r'''Data file parsing.
 
 import re
 import codecs
+from collections.abc import Callable
 from sixx.input import *
 from sixx.multidict import multidict
 from sixx.struct import struct
-import collections
 
 def lines(path):
     firstline = open(path).readline()
@@ -657,7 +657,7 @@ class Part(dataset):
         assert len(lines) != 0
         line = lines[0]
         loc = None
-        if hasattr(line, 'loc') and isinstance(line.loc, collections.Callable):
+        if hasattr(line, 'loc') and isinstance(line.loc, Callable):
             loc = line.loc()
         delim = None
         if (len(line) == 2 and

@@ -4,10 +4,10 @@ r'''Country and area.
 '''
 
 import re
+from collections.abc import Callable
 from sixx.multilang import multilang
 from sixx.input import InputError
 from sixx.node import *
-import collections
 
 __all__ = ['World', 'Country', 'Area', 'Place', 'Has_country', 'Has_area']
 
@@ -167,7 +167,7 @@ class _Matcher(object):
     def matches(self, name):
         name = name.upper()
         for n in self.all_names_upper():
-            if hasattr(n, 'matches') and isinstance(n.matches, collections.Callable):
+            if hasattr(n, 'matches') and isinstance(n.matches, Callable):
                 if n.matches(name):
                     return True
             else:

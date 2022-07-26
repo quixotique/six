@@ -8,9 +8,7 @@ messages based on any fragment of the input, because the L{itext} string will
 correctly supply the location of that fragment in the application's input.
 
 '''
-import collections
-
-
+from collections.abc import Callable
 
 __all__ = ['itext', 'iloc', 'InputError', 'loc_of']
 
@@ -535,7 +533,7 @@ class InputError(Exception):
 
     @staticmethod
     def _as_line(obj):
-        if hasattr(obj, 'as_line') and isinstance(obj.as_line, collections.Callable):
+        if hasattr(obj, 'as_line') and isinstance(obj.as_line, Callable):
             return obj.as_line()
         return obj
 
@@ -547,7 +545,7 @@ class InputError(Exception):
         return ': '.join(r)
 
 def loc_of(obj):
-    if hasattr(obj, 'loc') and isinstance(obj.loc, collections.Callable):
+    if hasattr(obj, 'loc') and isinstance(obj.loc, Callable):
         return obj.loc()
     try:
         return obj + 0
