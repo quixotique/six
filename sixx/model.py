@@ -744,7 +744,7 @@ class ModelParser(object):
             kw['is_head'] = is_head
         if part:
             import inspect
-            kwa = dict.fromkeys(inspect.getargspec(ltype.__init__)[0])
+            kwa = dict.fromkeys(inspect.getfullargspec(ltype.__init__)[0])
             if ('is_head' in kwa and hasattr(part, 'delim') and
                 'is_head' not in kw):
                 kw['is_head'] = part.delim != '-'
